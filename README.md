@@ -547,6 +547,7 @@ Thanks to the following partners for helping shape Agent Trace:
 - [git-ai](https://github.com/git-ai-project/git-ai)
 - [Jules](https://jules.google)
 - [OpenCode](https://opencode.ai)
+- [Tapes](https://tapes.dev)
 - [Vercel](https://vercel.com)
 
 This specification is accepting suggestions on [GitHub](https://github.com/cursor/agent-trace).
