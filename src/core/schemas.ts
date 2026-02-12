@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
+export const SPEC_VERSION = "0.1.0";
+
 const SCHEMA_BASE_URL = "https://agent-trace.dev/schemas/v1";
 
 export const ContributorTypeSchema = z.enum([
@@ -11,8 +13,11 @@ export const ContributorTypeSchema = z.enum([
 ]);
 
 export const ToolSchema = z.object({
-  name: z.string().describe("Name of the tool that produced the code"),
-  version: z.string().describe("Version of the tool"),
+  name: z
+    .string()
+    .optional()
+    .describe("Name of the tool that produced the code"),
+  version: z.string().optional().describe("Version of the tool"),
 });
 
 export const ContributorSchema = z.object({
@@ -22,7 +27,7 @@ export const ContributorSchema = z.object({
     .max(250)
     .optional()
     .describe(
-      "The model's unique identifier following models.dev convention (e.g., 'anthropic/claude-opus-4-5-20251101')"
+      "The model's unique identifier following models.dev convention (e.g., 'anthropic/claude-opus-4-5-20251101')",
     ),
 });
 
@@ -37,11 +42,9 @@ export const RangeSchema = z.object({
   content_hash: z
     .string()
     .optional()
-    .describe(
-      "Hash of attributed content for position-independent tracking"
-    ),
+    .describe("Hash of attributed content for position-independent tracking"),
   contributor: ContributorSchema.optional().describe(
-    "Override contributor for this specific range (e.g., for agent handoffs)"
+    "Override contributor for this specific range (e.g., for agent handoffs)",
   ),
 });
 
@@ -52,7 +55,7 @@ export const ConversationSchema = z.object({
     .optional()
     .describe("URL to look up the conversation that produced this code"),
   contributor: ContributorSchema.optional().describe(
-    "The contributor for ranges in this conversation (can be overridden per-range)"
+    "The contributor for ranges in this conversation (can be overridden per-range)",
   ),
   ranges: z
     .array(RangeSchema)
@@ -74,37 +77,35 @@ export const VcsTypeSchema = z.enum(["git", "jj", "hg", "svn"]);
 
 export const VcsSchema = z.object({
   type: VcsTypeSchema.describe(
-    "Version control system type (e.g., 'git', 'jj', 'hg')"
+    "Version control system type (e.g., 'git', 'jj', 'hg')",
   ),
   revision: z
     .string()
     .describe(
-      "Revision identifier (e.g., git commit SHA, jj change ID, hg changeset)"
+      "Revision identifier (e.g., git commit SHA, jj change ID, hg changeset)",
     ),
 });
 
 export const TraceRecordSchema = z.object({
   version: z
     .string()
-    .regex(/^[0-9]+\\.[0-9]+\\.[0-9]+$/)
-    .describe("Agent Trace specification version (e.g., '1.0')"),
+    .regex(/^[0-9]+\.[0-9]+\.[0-9]+$/)
+    .describe("Agent Trace specification version (e.g., '0.1.0')"),
   id: z.string().uuid().describe("Unique identifier for this trace record"),
   timestamp: z
     .string()
-    .datetime()
+    .datetime({ offset: true })
     .describe("RFC 3339 timestamp when trace was recorded"),
   vcs: VcsSchema.optional().describe(
-    "Version control system information for this trace"
+    "Version control system information for this trace",
   ),
   tool: ToolSchema.optional().describe("The tool that generated this trace"),
-  files: z
-    .array(FileSchema)
-    .describe("Array of files with attributed ranges"),
+  files: z.array(FileSchema).describe("Array of files with attributed ranges"),
   metadata: z
     .record(z.string(), z.unknown())
     .optional()
     .describe(
-      "Additional metadata for implementation-specific or vendor-specific data"
+      "Additional metadata for implementation-specific or vendor-specific data",
     ),
 });
 

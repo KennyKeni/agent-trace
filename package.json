@@ -1,17 +1,37 @@
 {
-  "version": "1.0.0",
+  "name": "@kennykeni/agent-trace",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "agent-trace": "src/cli.ts"
+  },
+  "files": [
+    "src/",
+    "!src/**/__tests__/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KennyKeni/agent-trace.git"
+  },
   "scripts": {
     "build": "bun run index.ts",
-    "dev": "bun run index.ts --dev"
+    "dev": "bun run index.ts --dev",
+    "check": "tsc --noEmit && biome check .",
+    "check:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "test": "bun test"
   },
   "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.14",
+    "@types/bun": "latest",
     "marked": "^15.0.0",
     "marked-shiki": "^1.2.0",
     "shiki": "^3.0.0",
-    "zod": "^3.24.0",
     "zod-to-json-schema": "^3.24.0"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
   }
 }

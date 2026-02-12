@@ -1,9 +1,9 @@
+import { watch } from "node:fs";
+import { join } from "node:path";
 import { marked } from "marked";
 import markedShiki from "marked-shiki";
 import { createHighlighter } from "shiki";
-import { watch } from "fs";
-import { join } from "path";
-import { generateJsonSchemas } from "./schemas";
+import { generateJsonSchemas } from "./src/core/schemas";
 
 const isDevMode = process.argv.includes("--dev");
 
@@ -47,26 +47,37 @@ const imageDimensions: Record<string, { width: number; height: number }> = {
 const darkModeImages = new Set(["/assets/images/agent-trace-diagram.png"]);
 
 const renderer = {
-  heading({ tokens, depth }: { tokens: any[]; depth: number }) {
+  heading(
+    this: { parser: { parseInline(tokens: unknown[]): string } },
+    { tokens, depth }: { tokens: any[]; depth: number },
+  ) {
     const text = tokens.map((t: any) => t.raw || t.text || "").join("");
     const id = slugify(text);
     return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`;
   },
-  image({ href, title, text }: { href: string; title: string | null; text: string }) {
+  image({
+    href,
+    title,
+    text,
+  }: {
+    href: string;
+    title: string | null;
+    text: string;
+  }) {
     const dims = imageDimensions[href];
     const widthAttr = dims ? ` width="${dims.width}"` : "";
     const heightAttr = dims ? ` height="${dims.height}"` : "";
     const titleAttr = title ? ` title="${title}"` : "";
-    
+
     if (darkModeImages.has(href)) {
       const darkHref = href.replace(/\.png$/, "-dark.png");
       const darkDims = imageDimensions[darkHref];
       const darkWidthAttr = darkDims ? ` width="${darkDims.width}"` : "";
       const darkHeightAttr = darkDims ? ` height="${darkDims.height}"` : "";
-      
+
       return `<img src="${href}" alt="${text}"${titleAttr}${widthAttr}${heightAttr} loading="lazy" decoding="async" class="img-light"><img src="${darkHref}" alt="${text}"${titleAttr}${darkWidthAttr}${darkHeightAttr} loading="lazy" decoding="async" class="img-dark">`;
     }
-    
+
     return `<img src="${href}" alt="${text}"${titleAttr}${widthAttr}${heightAttr} loading="lazy" decoding="async">`;
   },
 };
@@ -84,7 +95,7 @@ marked.use(
         defaultColor: false,
       });
     },
-  })
+  }),
 );
 
 const getStyles = () => `
@@ -539,7 +550,7 @@ const getTemplate = (content: string, title: string) => `<!DOCTYPE html>
 
 function extractTitle(markdown: string): string {
   const match = markdown.match(/^#\s+(.+)$/m);
-  return match ? match[1] : "Agent Trace";
+  return match?.[1] ?? "Agent Trace";
 }
 
 async function build() {
@@ -598,7 +609,11 @@ async function build() {
   const distImagesDir = join(distAssetsDir, "images");
   await Bun.write(`${distImagesDir}/.gitkeep`, "");
 
-  for (const image of ["agent-trace.png", "agent-trace-diagram.png", "agent-trace-diagram-dark.png"]) {
+  for (const image of [
+    "agent-trace.png",
+    "agent-trace-diagram.png",
+    "agent-trace-diagram-dark.png",
+  ]) {
     const src = join(imagesDir, image);
     const dest = join(distImagesDir, image);
     const file = await Bun.file(src).arrayBuffer();
@@ -613,11 +628,13 @@ async function build() {
   for (const [filename, schema] of Object.entries(schemas)) {
     await Bun.write(
       join(schemasDir, filename),
-      JSON.stringify(schema, null, 2)
+      JSON.stringify(schema, null, 2),
     );
   }
 
-  console.log(`Build complete! Output: dist/index.html + ${Object.keys(schemas).length} schemas`);
+  console.log(
+    `Build complete! Output: dist/index.html + ${Object.keys(schemas).length} schemas`,
+  );
 }
 
 async function startDevServer() {
@@ -655,7 +672,7 @@ async function startDevServer() {
 
   console.log(`Dev server running at http://localhost:${server.port}`);
 
-  const watcher = watch(".", { recursive: true }, async (event, filename) => {
+  const watcher = watch(".", { recursive: true }, async (_event, filename) => {
     if (
       filename &&
       !filename.startsWith("dist") &&
