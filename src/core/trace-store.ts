@@ -7,10 +7,11 @@ import type {
   Range,
   TraceRecord,
   Vcs,
+  VcsType,
 } from "./schemas";
 import { SPEC_VERSION } from "./schemas";
 import type { FileEdit, RangePosition } from "./types";
-import { ensureDir, normalizeNewlines, resolvePosition } from "./utils";
+import { ensureDir, resolvePosition } from "./utils";
 
 export type {
   ContributorType,
@@ -30,44 +31,103 @@ function contentHash(text: string): string {
 
 const TRACE_PATH = ".agent-trace/traces.jsonl";
 
-let cachedRoot: string | undefined;
-
-export function getWorkspaceRoot(): string {
-  if (cachedRoot) return cachedRoot;
-  if (process.env.AGENT_TRACE_WORKSPACE_ROOT) {
-    cachedRoot = process.env.AGENT_TRACE_WORKSPACE_ROOT;
-    return cachedRoot;
-  }
-  if (process.env.CURSOR_PROJECT_DIR) {
-    cachedRoot = process.env.CURSOR_PROJECT_DIR;
-    return cachedRoot;
-  }
-  if (process.env.CLAUDE_PROJECT_DIR) {
-    cachedRoot = process.env.CLAUDE_PROJECT_DIR;
-    return cachedRoot;
-  }
-  try {
-    cachedRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    cachedRoot = process.cwd();
-  }
-  return cachedRoot;
+interface VcsDetector {
+  type: VcsType;
+  rootCmd: [string, string[]];
+  revisionCmd: [string, string[]];
+  normalizeRevision?: (raw: string) => string;
 }
 
-export function getVcsInfo(cwd: string): Vcs | undefined {
+const VCS_DETECTORS: VcsDetector[] = [
+  {
+    type: "jj",
+    rootCmd: ["jj", ["root"]],
+    revisionCmd: ["jj", ["log", "-r", "@", "--no-graph", "-T", "change_id"]],
+  },
+  {
+    type: "hg",
+    rootCmd: ["hg", ["root"]],
+    revisionCmd: ["hg", ["id", "-i"]],
+    normalizeRevision: (raw) => raw.replace(/\+$/, ""),
+  },
+  {
+    type: "svn",
+    rootCmd: ["svn", ["info", "--show-item", "wc-root"]],
+    revisionCmd: ["svn", ["info", "--show-item", "revision"]],
+  },
+  {
+    type: "git",
+    rootCmd: ["git", ["rev-parse", "--show-toplevel"]],
+    revisionCmd: ["git", ["rev-parse", "HEAD"]],
+  },
+];
+
+type VcsContext = { root: string; vcs?: Vcs };
+
+function execQuiet(
+  cmd: string,
+  args: string[],
+  cwd?: string,
+): string | undefined {
   try {
-    const revision = execFileSync("git", ["rev-parse", "HEAD"], {
+    return execFileSync(cmd, args, {
       cwd,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "ignore"],
     }).trim();
-    return { type: "git", revision };
   } catch {
     return undefined;
   }
+}
+
+export function detectVcsContext(cwd: string): VcsContext {
+  for (const detector of VCS_DETECTORS) {
+    const root = execQuiet(...detector.rootCmd, cwd);
+    if (!root) continue;
+
+    const rawRevision = execQuiet(...detector.revisionCmd, cwd);
+    const vcs = rawRevision
+      ? {
+          type: detector.type,
+          revision: detector.normalizeRevision
+            ? detector.normalizeRevision(rawRevision)
+            : rawRevision,
+        }
+      : undefined;
+
+    return { root, vcs };
+  }
+  return { root: cwd };
+}
+
+let cachedContext: VcsContext | undefined;
+
+function getCachedContext(): VcsContext {
+  if (!cachedContext) {
+    cachedContext = detectVcsContext(process.cwd());
+  }
+  return cachedContext;
+}
+
+export function getWorkspaceRoot(): string {
+  if (process.env.AGENT_TRACE_WORKSPACE_ROOT) {
+    return process.env.AGENT_TRACE_WORKSPACE_ROOT;
+  }
+  if (process.env.CURSOR_PROJECT_DIR) {
+    return process.env.CURSOR_PROJECT_DIR;
+  }
+  if (process.env.CLAUDE_PROJECT_DIR) {
+    return process.env.CLAUDE_PROJECT_DIR;
+  }
+  return getCachedContext().root;
+}
+
+export function getVcsInfo(cwd: string): Vcs | undefined {
+  const ctx = getCachedContext();
+  if (ctx.root === cwd || resolve(ctx.root) === resolve(cwd)) {
+    return ctx.vcs;
+  }
+  return detectVcsContext(cwd).vcs;
 }
 
 export function toRelativePath(
@@ -77,7 +137,12 @@ export function toRelativePath(
   if (!isAbsolute(filePath)) {
     const resolved = resolve(root, filePath);
     const rel = relative(resolve(root), resolved);
-    if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) || rel === "")
+    if (
+      rel === ".." ||
+      rel.startsWith(`..${sep}`) ||
+      isAbsolute(rel) ||
+      rel === ""
+    )
       return undefined;
     return rel;
   }

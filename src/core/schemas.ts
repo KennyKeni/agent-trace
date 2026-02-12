@@ -1,9 +1,6 @@
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 export const SPEC_VERSION = "0.1.0";
-
-const SCHEMA_BASE_URL = "https://agent-trace.dev/schemas/v1";
 
 export const ContributorTypeSchema = z.enum([
   "human",
@@ -108,23 +105,6 @@ export const TraceRecordSchema = z.object({
       "Additional metadata for implementation-specific or vendor-specific data",
     ),
 });
-
-export function generateJsonSchemas(): Record<string, object> {
-  const schemas: Record<string, object> = {};
-
-  // Trace Record Schema
-  schemas["trace-record.json"] = {
-    ...zodToJsonSchema(TraceRecordSchema, {
-      name: "TraceRecord",
-      $refStrategy: "none",
-    }),
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    $id: `${SCHEMA_BASE_URL}/trace-record.json`,
-    title: "Agent Trace Record",
-  };
-
-  return schemas;
-}
 
 export type ContributorType = z.infer<typeof ContributorTypeSchema>;
 export type VcsType = z.infer<typeof VcsTypeSchema>;

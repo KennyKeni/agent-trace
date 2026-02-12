@@ -103,7 +103,7 @@ Schema source: [`schemas.ts`](./src/core/schemas.ts)
 
 ## Known limitations
 
-- **Path normalization edge cases**: Relative path conversion is string-prefix based today; some sibling-path cases can produce `..` segments.
+- **indexOf-based range attribution**: When the same text appears multiple times in a file, line-range attribution may point to the first occurrence rather than the actual edit location. Providers don't always supply line numbers, so `indexOf` is the best-effort fallback.
 - **Bun-only**: The hook runtime and CLI require Bun. Node.js is not supported.
 - **No VCS requirement**: Works without git. When git is available, traces include the current commit SHA. Without git, VCS info is omitted.
 

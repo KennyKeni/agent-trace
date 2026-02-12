@@ -4,7 +4,7 @@ async function emitToAgentTrace(root: string, payload: unknown): Promise<void> {
   await new Promise<void>((resolve) => {
     const child = spawn(
       "bunx",
-      ["@kennykeni/agent-trace", "hook", "--provider", "opencode"],
+      ["@kennykeni/agent-trace@0.1.2", "hook", "--provider", "opencode"],
       {
         cwd: root,
         stdio: ["pipe", "ignore", "ignore"],

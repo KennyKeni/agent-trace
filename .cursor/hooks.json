@@ -3,32 +3,32 @@
   "hooks": {
     "sessionStart": [
       {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
+        "command": "bunx @kennykeni/agent-trace@0.1.2 hook --provider cursor"
       }
     ],
     "sessionEnd": [
       {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
-      }
-    ],
-    "afterFileEdit": [
-      {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
-      }
-    ],
-    "afterTabFileEdit": [
-      {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
-      }
-    ],
-    "afterShellExecution": [
-      {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
+        "command": "bunx @kennykeni/agent-trace@0.1.2 hook --provider cursor"
       }
     ],
     "beforeSubmitPrompt": [
       {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
+        "command": "bunx @kennykeni/agent-trace@0.1.2 hook --provider cursor"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "bunx @kennykeni/agent-trace@0.1.2 hook --provider cursor"
+      }
+    ],
+    "afterTabFileEdit": [
+      {
+        "command": "bunx @kennykeni/agent-trace@0.1.2 hook --provider cursor"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "bunx @kennykeni/agent-trace@0.1.2 hook --provider cursor"
       }
     ]
   }
