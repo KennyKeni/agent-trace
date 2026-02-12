@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish:
@@ -17,12 +18,17 @@ jobs:
         with:
           bun-version: latest
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
       - run: bun install --frozen-lockfile
 
       - run: bun run check
 
       - run: bun test
 
-      - run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
-          npm publish --access public
+      - run: npm install -g npm@latest
+
+      - run: npm publish --provenance --access public
