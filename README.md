@@ -49,13 +49,16 @@ bunx @kennykeni/agent-trace status
 
 ## What `init` does
 
-Configures the target repo's provider settings:
+Creates `.agent-trace/config.json` with default settings and configures the target repo's provider hooks:
 
-| Provider   | Config written                            |
-| ---------- | ----------------------------------------- |
-| Cursor     | `.cursor/hooks.json`                      |
-| Claude Code| `.claude/settings.json`                   |
-| OpenCode   | `.opencode/plugins/agent-trace.ts`        |
+| File                                    | Purpose                          |
+| --------------------------------------- | -------------------------------- |
+| `.agent-trace/config.json`              | Extensions and ignore settings   |
+| `.cursor/hooks.json`                    | Cursor hook registration         |
+| `.claude/settings.json`                 | Claude Code hook registration    |
+| `.opencode/plugins/agent-trace.ts`      | OpenCode plugin registration     |
+
+Existing `config.json` files are never overwritten — only created when absent.
 
 ## How it works
 
@@ -72,20 +75,49 @@ Additional artifacts are written by extensions under `.agent-trace/`:
 - `diffs/<provider>/<session>.patch` -- diff artifacts when available (`diffs` extension)
 - `line-hashes/<provider>/<session>.jsonl` -- per-line content hashes (`line-hashes` extension)
 
-## Extensions
+## Configuration
 
-Extensions are pluggable modules that run alongside the core trace pipeline. Four are built in: `raw-events`, `diffs`, `messages`, and `line-hashes`. All extensions are enabled by default.
-
-To control which extensions run, create `.agent-trace/config.json` in your project root:
+`init` generates `.agent-trace/config.json` with these defaults:
 
 ```json
-{ "extensions": ["diffs", "messages"] }
+{
+  "extensions": ["diffs", "line-hashes", "raw-events", "messages"],
+  "useGitignore": true,
+  "useBuiltinSensitive": true,
+  "ignore": [],
+  "ignoreMode": "redact"
+}
 ```
 
-- **File absent** -- all registered extensions run (default)
+### Extensions
+
+Extensions are pluggable modules that run alongside the core trace pipeline. Four are built in: `raw-events`, `diffs`, `messages`, and `line-hashes`.
+
 - **`"extensions": ["diffs", "messages"]`** -- only listed extensions run
 - **`"extensions": []`** -- no extensions run (only `traces.jsonl` is written)
-- **Malformed JSON** -- warning logged, all extensions run
+
+### Sensitive file filtering
+
+By default, agent-trace filters sensitive files to prevent secrets from leaking into trace artifacts. Filtering applies to `traces.jsonl`, diffs, line-hashes, and raw events.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `useGitignore` | `true` | Respect `.gitignore` patterns via `git check-ignore` |
+| `useBuiltinSensitive` | `true` | Apply built-in sensitive file patterns |
+| `ignore` | `[]` | Additional glob patterns to filter |
+| `ignoreMode` | `"redact"` | `"redact"` keeps the trace entry with path but no content; `"skip"` drops the event entirely |
+
+Built-in sensitive patterns match at any depth:
+
+```
+.env  .env.*  *.pem  *.key  *.p12  *.pfx
+id_rsa  id_dsa  id_ecdsa  id_ed25519
+*.kubeconfig  credentials.*
+```
+
+When a file is **redacted**, the trace records the file path with empty ranges and `metadata.redacted: true`. Extensions see empty edits and produce no diff/hash artifacts. Raw events have sensitive fields (`old_string`, `new_string`, `content`, `before`, `after`, `originalFile`) replaced with `"[REDACTED]"`.
+
+When a file is **skipped**, no trace entry, diff, hash, or raw event is written.
 
 ## Trace format
 
@@ -105,7 +137,9 @@ Schema source: [`schemas.ts`](./src/core/schemas.ts)
 
 - **indexOf-based range attribution**: When the same text appears multiple times in a file, line-range attribution may point to the first occurrence rather than the actual edit location. Providers don't always supply line numbers, so `indexOf` is the best-effort fallback.
 - **Bun-only**: The hook runtime and CLI require Bun. Node.js is not supported.
-- **No VCS requirement**: Works without git. When git is available, traces include the current commit SHA. Without git, VCS info is omitted.
+- **No VCS requirement**: Works without git. When git is available, traces include the current commit SHA. Without git, VCS info is omitted. `useGitignore` silently becomes a no-op in non-git repos.
+- **Multi-file OpenCode events**: If any file in a `hook:tool.execute.after` payload is ignored, the entire raw event is redacted/skipped (conservative approach).
+- **`.env.*` matches broadly**: `**/.env.*` matches `.env.example` and `.env.template` intentionally — these files sometimes contain real values.
 
 ## Provider quirks
 
