@@ -1,16 +1,12 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
+import { structuredPatch } from "diff";
 import { registerExtension } from "../core/trace-hook";
 import { getWorkspaceRoot } from "../core/trace-store";
 import { normalizeNewlines } from "../core/utils";
 import { ensureParent, nowIso, sanitizeSessionId } from "./helpers";
 
 const TRACE_ROOT_DIR = ".agent-trace";
-
-function normalizeLines(input: string): string[] {
-  if (!input) return [];
-  return normalizeNewlines(input).split("\n");
-}
 
 export function createPatchFromStrings(
   filePath: string,
@@ -21,25 +17,32 @@ export function createPatchFromStrings(
 
   const oldExists = oldText !== undefined;
   const newExists = newText !== undefined;
-  const oldNorm = oldText ?? "";
-  const newNorm = newText ?? "";
-  const oldLines = normalizeLines(oldNorm);
-  const newLines = normalizeLines(newNorm);
+  const oldNorm = normalizeNewlines(oldText ?? "");
+  const newNorm = normalizeNewlines(newText ?? "");
 
   const fromFile = oldExists ? `a/${filePath}` : "/dev/null";
   const toFile = newExists ? `b/${filePath}` : "/dev/null";
-  const oldStart = oldLines.length === 0 ? 0 : 1;
-  const newStart = newLines.length === 0 ? 0 : 1;
+
+  const patch = structuredPatch(fromFile, toFile, oldNorm, newNorm, "", "", {
+    context: 3,
+  });
+
+  if (patch.hunks.length === 0) return undefined;
 
   const lines: string[] = [
     `diff --git a/${filePath} b/${filePath}`,
     `--- ${fromFile}`,
     `+++ ${toFile}`,
-    `@@ -${oldStart},${oldLines.length} +${newStart},${newLines.length} @@`,
   ];
 
-  for (const line of oldLines) lines.push(`-${line}`);
-  for (const line of newLines) lines.push(`+${line}`);
+  for (const hunk of patch.hunks) {
+    lines.push(
+      `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
+    );
+    for (const line of hunk.lines) {
+      lines.push(line);
+    }
+  }
 
   return `${lines.join("\n")}\n`;
 }
@@ -69,6 +72,7 @@ registerExtension({
   onTraceEvent(event) {
     if (event.kind !== "file_edit") return;
     if (event.diffs === false) return;
+
     for (const edit of event.edits) {
       const diff = createPatchFromStrings(
         event.filePath,

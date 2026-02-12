@@ -1,7 +1,12 @@
 #!/usr/bin/env bun
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  extractFilePathsFromRaw,
+  type IgnoreConfig,
+  isIgnored,
+  loadConfig,
+  scrubRawInput,
+} from "./ignore";
 import {
   appendTrace,
   computeRangePositions,
@@ -43,41 +48,11 @@ function parseProvider(argv: string[]): string | undefined {
   return undefined;
 }
 
-function loadExtensionConfig(root: string): string[] | null {
-  const configPath = join(root, ".agent-trace", "config.json");
-  let raw: string;
-  try {
-    raw = readFileSync(configPath, "utf-8");
-  } catch {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      Array.isArray(parsed.extensions)
-    ) {
-      return parsed.extensions.filter(
-        (e: unknown): e is string => typeof e === "string",
-      );
-    }
-    console.error(
-      "agent-trace: config.json missing 'extensions' array, running all extensions",
-    );
-    return null;
-  } catch {
-    console.error("agent-trace: malformed config.json, running all extensions");
-    return null;
-  }
-}
-
-function activeExtensions(root: string): Extension[] {
-  const allowlist = loadExtensionConfig(root);
-  if (allowlist === null) return [...extensionRegistry.values()];
+export function activeExtensions(extensionNames: string[] | null): Extension[] {
+  if (extensionNames === null) return [...extensionRegistry.values()];
 
   const active: Extension[] = [];
-  for (const name of allowlist) {
+  for (const name of extensionNames) {
     const ext = extensionRegistry.get(name);
     if (ext) {
       active.push(ext);
@@ -150,6 +125,63 @@ function writeTrace(event: TraceEvent): void {
   }
 }
 
+function applyIgnoreFilter(
+  event: TraceEvent,
+  root: string,
+  ignoreConfig: IgnoreConfig,
+): TraceEvent | null {
+  if (event.kind !== "file_edit") return event;
+  if (!isIgnored(event.filePath, root, ignoreConfig)) return event;
+
+  if (ignoreConfig.mode === "skip") return null;
+
+  return {
+    ...event,
+    edits: [],
+    diffs: false,
+    readContent: false,
+    meta: { ...event.meta, redacted: true },
+  };
+}
+
+export function dispatchTraceEvent(
+  event: TraceEvent,
+  extensions: Extension[],
+  toolInfo?: { name: string; version?: string },
+  ignoreConfig?: IgnoreConfig,
+): void {
+  const root = getWorkspaceRoot();
+  const enrichedEvent = toolInfo ? { ...event, tool: toolInfo } : event;
+
+  const filtered = ignoreConfig
+    ? applyIgnoreFilter(enrichedEvent, root, ignoreConfig)
+    : enrichedEvent;
+  if (!filtered) return;
+
+  writeTrace(filtered);
+  for (const ext of extensions) {
+    if (ext.onTraceEvent) {
+      try {
+        ext.onTraceEvent(filtered);
+      } catch (e) {
+        console.error(`Extension error (${ext.name}/onTraceEvent):`, e);
+      }
+    }
+  }
+}
+
+function shouldFilterRawInput(
+  provider: string,
+  input: HookInput,
+  root: string,
+  ignoreConfig: IgnoreConfig,
+): boolean {
+  const paths = extractFilePathsFromRaw(provider, input);
+  if (paths === null) return false;
+  if (paths.length === 0) return true;
+  return paths.some((p) => isIgnored(p, root, ignoreConfig));
+}
+
 export async function runHook() {
   if (providerRegistry.size === 0) {
     console.error(
@@ -189,13 +221,28 @@ export async function runHook() {
 
     process.env.AGENT_TRACE_PROVIDER = providerName;
 
+    const root = getWorkspaceRoot();
+    const config = loadConfig(root);
     const sessionId = adapter.sessionIdFor(input);
-    const extensions = activeExtensions(getWorkspaceRoot());
+    const extensions = activeExtensions(config.extensions);
+    const { ignore: ignoreConfig } = config;
+
+    const rawFiltered = shouldFilterRawInput(
+      providerName,
+      input,
+      root,
+      ignoreConfig,
+    );
 
     for (const ext of extensions) {
       if (ext.onRawInput) {
         try {
-          ext.onRawInput(providerName, sessionId, input);
+          if (rawFiltered) {
+            if (ignoreConfig.mode === "skip") continue;
+            ext.onRawInput(providerName, sessionId, scrubRawInput(input));
+          } else {
+            ext.onRawInput(providerName, sessionId, input);
+          }
         } catch (e) {
           console.error(`Extension error (${ext.name}/onRawInput):`, e);
         }
@@ -208,17 +255,7 @@ export async function runHook() {
     if (result) {
       const events = Array.isArray(result) ? result : [result];
       for (const raw of events) {
-        const event = toolInfo ? { ...raw, tool: toolInfo } : raw;
-        writeTrace(event);
-        for (const ext of extensions) {
-          if (ext.onTraceEvent) {
-            try {
-              ext.onTraceEvent(event);
-            } catch (e) {
-              console.error(`Extension error (${ext.name}/onTraceEvent):`, e);
-            }
-          }
-        }
+        dispatchTraceEvent(raw, extensions, toolInfo, ignoreConfig);
       }
     }
   } catch (e) {

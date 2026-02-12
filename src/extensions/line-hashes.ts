@@ -52,6 +52,7 @@ registerExtension({
   name: "line-hashes",
   onTraceEvent(event) {
     if (event.kind !== "file_edit") return;
+    if (event.edits.length === 0) return;
     const fileContent = event.readContent
       ? tryReadFile(event.filePath)
       : undefined;

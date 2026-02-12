@@ -1,11 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  mock,
-  test,
-} from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 let execResponses: Map<string, string>;
 
@@ -41,10 +34,7 @@ function restoreEnv() {
 
 describe("detectVcsContext", () => {
   test("detects git repo", () => {
-    execResponses.set(
-      "git rev-parse --show-toplevel",
-      "/home/user/project\n",
-    );
+    execResponses.set("git rev-parse --show-toplevel", "/home/user/project\n");
     execResponses.set("git rev-parse HEAD", "abc123def\n");
 
     const ctx = detectVcsContext("/home/user/project");
@@ -54,10 +44,7 @@ describe("detectVcsContext", () => {
 
   test("detects jj repo", () => {
     execResponses.set("jj root", "/home/user/project\n");
-    execResponses.set(
-      "jj log -r @ --no-graph -T change_id",
-      "kkmpptxn1234\n",
-    );
+    execResponses.set("jj log -r @ --no-graph -T change_id", "kkmpptxn1234\n");
 
     const ctx = detectVcsContext("/home/user/project");
     expect(ctx.root).toBe("/home/user/project");
@@ -92,14 +79,8 @@ describe("detectVcsContext", () => {
 
   test("jj takes priority over git when both present", () => {
     execResponses.set("jj root", "/home/user/project\n");
-    execResponses.set(
-      "jj log -r @ --no-graph -T change_id",
-      "kkmpptxn1234\n",
-    );
-    execResponses.set(
-      "git rev-parse --show-toplevel",
-      "/home/user/project\n",
-    );
+    execResponses.set("jj log -r @ --no-graph -T change_id", "kkmpptxn1234\n");
+    execResponses.set("git rev-parse --show-toplevel", "/home/user/project\n");
     execResponses.set("git rev-parse HEAD", "abc123def\n");
 
     const ctx = detectVcsContext("/home/user/project");
@@ -113,10 +94,7 @@ describe("detectVcsContext", () => {
   });
 
   test("returns root without vcs when root succeeds but revision fails", () => {
-    execResponses.set(
-      "git rev-parse --show-toplevel",
-      "/home/user/project\n",
-    );
+    execResponses.set("git rev-parse --show-toplevel", "/home/user/project\n");
     // git rev-parse HEAD not set -> will throw -> no revision
 
     const ctx = detectVcsContext("/home/user/project");

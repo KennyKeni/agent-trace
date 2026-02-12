@@ -107,6 +107,30 @@ Schema source: [`schemas.ts`](./src/core/schemas.ts)
 - **Bun-only**: The hook runtime and CLI require Bun. Node.js is not supported.
 - **No VCS requirement**: Works without git. When git is available, traces include the current commit SHA. Without git, VCS info is omitted.
 
+## Provider quirks
+
+### Cursor
+
+- **Tab edits lack file content**: `afterTabFileEdit` events do not set `readContent`, so line-hashes for tab completions have no file context for position resolution.
+- **Duration field ambiguity**: Shell events accept both `duration` and `duration_ms`. When both are present, `duration_ms` takes precedence.
+
+### Claude Code
+
+- **Model tracking limited to session start**: Claude Code only includes the `model` field in `SessionStart` hook payloads. Switching models mid-session via `/model` does not fire a hook event, so traces after a switch may reflect the original model. This is a Claude Code hook API limitation.
+- **Only Write, Edit, and Bash traced**: Other tool uses (Read, Search, etc.) are not hooked and produce no trace events.
+- **Write tool fallback**: When the `Write` tool payload has no `new_string`, falls back to `content`. When neither is present, an empty-edits trace is recorded.
+
+### OpenCode
+
+- **Two file-edit code paths**: `file.edited` events carry no diff data (`edits: []`, `diffs: false`). Only `hook:tool.execute.after` events include before/after content for diffs and line-hashes.
+- **Flexible session ID extraction**: Session IDs can appear in five different payload locations depending on the event type. The adapter tries them all in priority order.
+
+### Codex
+
+- **Only `apply_patch` tool calls traced**: File changes from shell commands or other mechanisms are not detected. Same contract as other providers — only explicit tool-reported edits are traced.
+- **Patch format stability**: `parsePatchInput` depends on Codex's `*** <Action> File:` patch grammar. If Codex changes the format, parsing fails silently.
+- **`*** Move to:` (rename) blocks not parsed**: Rename operations in apply_patch are not traced. This is a rare edge case.
+
 ## Development
 
 ```bash
