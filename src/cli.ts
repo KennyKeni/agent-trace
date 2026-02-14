@@ -3,22 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { processHookInput } from "./core/pipeline";
-import { registeredProviderNames } from "./core/registry";
-import { getWorkspaceRoot } from "./core/trace-store";
 import type { HookInput } from "./core/types";
-import { registerBuiltinExtensions } from "./extensions";
-import {
-  InstallError,
-  install,
-  parseArgs,
-  printInstallSummary,
-} from "./install";
-import { getPackageVersion } from "./install/utils";
-import { registerBuiltinProviders } from "./providers";
-
-registerBuiltinProviders();
-registerBuiltinExtensions();
 
 function parseProvider(argv: string[]): string | undefined {
   for (let i = 0; i < argv.length; i++) {
@@ -34,6 +19,14 @@ function parseProvider(argv: string[]): string | undefined {
 }
 
 async function runHook() {
+  const { registerBuiltinProviders } = await import("./providers");
+  const { registerBuiltinExtensions } = await import("./extensions");
+  const { registeredProviderNames } = await import("./core/registry");
+  const { processHookInput } = await import("./core/pipeline");
+
+  registerBuiltinProviders();
+  registerBuiltinExtensions();
+
   const registered = registeredProviderNames();
   if (registered.length === 0) {
     console.error("No providers registered.");
@@ -115,7 +108,9 @@ function codexConfigStatus(): "installed" | "not installed" {
   return checkHookConfig(configPath, "agent-trace");
 }
 
-function status(): void {
+async function status() {
+  const { getWorkspaceRoot } = await import("./core/trace-store");
+
   const root = getWorkspaceRoot();
 
   const cursorPath = join(root, ".cursor", "hooks.json");
@@ -147,6 +142,16 @@ const command = process.argv[2];
 
 switch (command) {
   case "init": {
+    const { registerBuiltinProviders } = await import("./providers");
+    const {
+      InstallError,
+      install,
+      parseArgs,
+      printInstallSummary,
+    } = await import("./install");
+
+    registerBuiltinProviders();
+
     try {
       const options = parseArgs(process.argv.slice(3));
       const changes = install(options);
@@ -170,12 +175,14 @@ switch (command) {
     break;
   }
   case "status":
-    status();
+    await status();
     break;
   case "--version":
-  case "-v":
+  case "-v": {
+    const { getPackageVersion } = await import("./install/utils");
     console.log(getPackageVersion());
     break;
+  }
   case "help":
   case "--help":
   case "-h":
