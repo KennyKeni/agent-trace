@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { registerExtension } from "../core/trace-hook";
 import { getWorkspaceRoot } from "../core/trace-store";
 import { appendJsonl, nowIso, sanitizeSessionId } from "./helpers";
 
@@ -31,9 +30,9 @@ export function appendMessage(
   return path;
 }
 
-registerExtension({
+export const messagesExtension = {
   name: "messages",
-  onTraceEvent(event) {
+  onTraceEvent(event: import("../core/types").TraceEvent) {
     if (event.kind !== "message") return;
     const metadata =
       Object.keys(event.meta).length > 0 ? event.meta : undefined;
@@ -45,4 +44,4 @@ registerExtension({
       metadata,
     });
   },
-});
+};

@@ -1,7 +1,8 @@
 import { join, resolve } from "node:path";
+import { dispatchTraceEvent } from "../core/dispatch";
 import type { IgnoreConfig } from "../core/ignore";
-import { loadConfig } from "../core/ignore";
-import { activeExtensions, dispatchTraceEvent } from "../core/trace-hook";
+import { isInitialized, loadConfig } from "../core/ignore";
+import { activeExtensions } from "../core/registry";
 import { getWorkspaceRoot } from "../core/trace-store";
 import type { FileEdit, TraceEvent } from "../core/types";
 import { appendJsonl, sanitizeSessionId } from "../extensions/helpers";
@@ -198,8 +199,8 @@ export class CodexTraceIngestor {
   pendingUserPrompt: string | undefined;
   lastAgentMessage: string | undefined;
 
-  constructor(transcriptPath?: string) {
-    this.transcriptPath = transcriptPath;
+  constructor(opts?: { transcriptPath?: string }) {
+    this.transcriptPath = opts?.transcriptPath;
   }
 
   private getIgnoreConfig(): IgnoreConfig {
@@ -212,6 +213,7 @@ export class CodexTraceIngestor {
   private emitTraceEvent(event: TraceEvent): void {
     if (!this.sessionId) return;
     const root = getWorkspaceRoot();
+    if (!isInitialized(root)) return;
     const config = loadConfig(root);
     const extensions = activeExtensions(config.extensions);
     dispatchTraceEvent(event, extensions, TOOL, this.getIgnoreConfig());
@@ -263,6 +265,11 @@ export class CodexTraceIngestor {
       case "response_item":
         this.onResponseItem(parsed.payload);
         break;
+      default:
+        console.warn(
+          `[agent-trace] Unknown Codex JSONL event type: "${outerType}"`,
+        );
+        break;
     }
 
     this.appendRaw(parsed);
@@ -271,6 +278,7 @@ export class CodexTraceIngestor {
   private appendRaw(event: RolloutLine): void {
     if (!this.sessionId) return;
     const root = getWorkspaceRoot();
+    if (!isInitialized(root)) return;
     const sid = sanitizeSessionId(this.sessionId);
     const path = join(root, ".agent-trace", "raw", "codex", `${sid}.jsonl`);
     appendJsonl(path, {
@@ -362,6 +370,8 @@ export class CodexTraceIngestor {
         break;
       case "function_call":
         this.onFunctionCall(payload);
+        break;
+      default:
         break;
     }
   }

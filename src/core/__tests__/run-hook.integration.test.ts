@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { SPEC_VERSION } from "../schemas";
@@ -40,10 +47,17 @@ function readJsonl(path: string): unknown[] {
     .map((line) => JSON.parse(line));
 }
 
+function initAgentTrace(dir: string): void {
+  const configDir = join(dir, ".agent-trace");
+  mkdirSync(configDir, { recursive: true });
+  writeFileSync(join(configDir, "config.json"), "{}", "utf-8");
+}
+
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), "agent-trace-integration-"));
+  initAgentTrace(tmpDir);
 });
 
 afterEach(() => {
@@ -314,6 +328,425 @@ describe("runHook integration", () => {
       expect(diff).toContain("+new a");
       expect(diff).toContain("-old b");
       expect(diff).toContain("+new b");
+    });
+  });
+
+  describe("snapshot middleware via hook pipeline", () => {
+    test("PreToolUse/Bash exits 0 and produces no trace", () => {
+      const { exitCode } = hook(
+        "claude",
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          session_id: "snap-1",
+          model: "claude-sonnet-4-5-20250929",
+        },
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      expect(existsSync(join(tmpDir, ".agent-trace", "traces.jsonl"))).toBe(
+        false,
+      );
+    });
+
+    test("cursor beforeShellExecution exits 0 and produces no trace", () => {
+      const { exitCode } = hook(
+        "cursor",
+        {
+          hook_event_name: "beforeShellExecution",
+          session_id: "snap-2",
+          model: "gpt-4",
+          generation_id: "gen-2",
+        },
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      expect(existsSync(join(tmpDir, ".agent-trace", "traces.jsonl"))).toBe(
+        false,
+      );
+    });
+
+    test("opencode hook:tool.execute.before exits 0 and produces no trace", () => {
+      const { exitCode } = hook(
+        "opencode",
+        {
+          hook_event_name: "hook:tool.execute.before",
+          tool_name: "bash",
+          session_id: "snap-3",
+          call_id: "call-oc-1",
+        },
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      expect(existsSync(join(tmpDir, ".agent-trace", "traces.jsonl"))).toBe(
+        false,
+      );
+    });
+
+    test("opencode command.executed is suppressed", () => {
+      const { exitCode } = hook(
+        "opencode",
+        {
+          hook_event_name: "command.executed",
+          event: { name: "git status" },
+          session_id: "oc-supp",
+        },
+        tmpDir,
+      );
+      expect(exitCode).toBe(0);
+
+      expect(existsSync(join(tmpDir, ".agent-trace", "traces.jsonl"))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("end-to-end snapshot attribution", () => {
+    let gitDir: string;
+
+    function execGit(args: string[], cwd: string): string {
+      const result = spawnSync("git", args, { cwd, encoding: "utf-8" });
+      if (result.status !== 0) {
+        throw new Error(`git ${args[0]} failed: ${result.stderr}`);
+      }
+      return (result.stdout ?? "").trim();
+    }
+
+    beforeEach(() => {
+      gitDir = mkdtempSync(join(tmpdir(), "agent-trace-e2e-snap-"));
+      execGit(["init", "--initial-branch=main"], gitDir);
+      execGit(["config", "user.email", "test@test.com"], gitDir);
+      execGit(["config", "user.name", "Test"], gitDir);
+      initAgentTrace(gitDir);
+      writeFileSync(join(gitDir, "initial.txt"), "hello\n");
+      execGit(["add", "-A"], gitDir);
+      execGit(["commit", "-m", "initial"], gitDir);
+    });
+
+    afterEach(() => {
+      rmSync(gitDir, { recursive: true, force: true });
+    });
+
+    test("PreToolUse/Bash + file change + PostToolUse/Bash produces snapshot file_edit", () => {
+      // Pre-hook
+      const pre = hook(
+        "claude",
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          session_id: "snap-e2e-1",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-snap-1",
+        },
+        gitDir,
+      );
+      expect(pre.exitCode).toBe(0);
+
+      // Simulate file change between pre and post
+      writeFileSync(join(gitDir, "created.ts"), "const x = 42;\n");
+
+      // Post-hook
+      const post = hook(
+        "claude",
+        {
+          hook_event_name: "PostToolUse",
+          tool_name: "Bash",
+          tool_input: { command: "echo create" },
+          session_id: "snap-e2e-1",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-snap-1",
+        },
+        gitDir,
+      );
+      expect(post.exitCode).toBe(0);
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      // Should have at least a shell trace + file_edit trace
+      expect(traces.length).toBeGreaterThanOrEqual(2);
+
+      const fileEditTrace = traces.find(
+        (t: any) =>
+          t.files?.[0]?.path === "created.ts" &&
+          t.metadata?.["dev.agent-trace.source"] === "vcs_snapshot",
+      );
+      expect(fileEditTrace).toBeDefined();
+      const ranges = (fileEditTrace as any).files[0].conversations[0].ranges;
+      expect(ranges.length).toBeGreaterThanOrEqual(1);
+      expect(ranges[0].start_line).toBeGreaterThanOrEqual(1);
+    });
+
+    test("opencode hook:tool.execute.before + file change + hook:tool.execute.after produces snapshot file_edit", () => {
+      const pre = hook(
+        "opencode",
+        {
+          hook_event_name: "hook:tool.execute.before",
+          tool_name: "bash",
+          session_id: "snap-oc-1",
+          call_id: "call-oc-snap-1",
+        },
+        gitDir,
+      );
+      expect(pre.exitCode).toBe(0);
+
+      writeFileSync(join(gitDir, "oc-created.ts"), "const oc = 42;\n");
+
+      const post = hook(
+        "opencode",
+        {
+          hook_event_name: "hook:tool.execute.after",
+          tool_name: "bash",
+          session_id: "snap-oc-1",
+          call_id: "call-oc-snap-1",
+        },
+        gitDir,
+      );
+      expect(post.exitCode).toBe(0);
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      const fileEditTrace = traces.find(
+        (t: any) =>
+          t.files?.[0]?.path === "oc-created.ts" &&
+          t.metadata?.["dev.agent-trace.source"] === "vcs_snapshot",
+      );
+      expect(fileEditTrace).toBeDefined();
+    });
+
+    test("cursor FIFO pairing handles two sequential shell calls in same generation", () => {
+      // First shell call
+      hook(
+        "cursor",
+        {
+          hook_event_name: "beforeShellExecution",
+          session_id: "snap-cur-fifo",
+          model: "gpt-4",
+          generation_id: "gen-shared",
+        },
+        gitDir,
+      );
+
+      writeFileSync(join(gitDir, "cur-fifo-1.ts"), "const a = 1;\n");
+
+      hook(
+        "cursor",
+        {
+          hook_event_name: "afterShellExecution",
+          session_id: "snap-cur-fifo",
+          model: "gpt-4",
+          generation_id: "gen-shared",
+        },
+        gitDir,
+      );
+
+      // Second shell call, same generation_id
+      hook(
+        "cursor",
+        {
+          hook_event_name: "beforeShellExecution",
+          session_id: "snap-cur-fifo",
+          model: "gpt-4",
+          generation_id: "gen-shared",
+        },
+        gitDir,
+      );
+
+      writeFileSync(join(gitDir, "cur-fifo-2.ts"), "const b = 2;\n");
+
+      hook(
+        "cursor",
+        {
+          hook_event_name: "afterShellExecution",
+          session_id: "snap-cur-fifo",
+          model: "gpt-4",
+          generation_id: "gen-shared",
+        },
+        gitDir,
+      );
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      const snapshotEdits = traces.filter(
+        (t: any) => t.metadata?.["dev.agent-trace.source"] === "vcs_snapshot",
+      );
+      const paths = snapshotEdits.map((t: any) => t.files?.[0]?.path);
+      expect(paths).toContain("cur-fifo-1.ts");
+      expect(paths).toContain("cur-fifo-2.ts");
+    });
+
+    test("snapshot file_edit events are redacted when file matches ignore pattern", () => {
+      // Write a config with ignore pattern for .env files
+      const configDir = join(gitDir, ".agent-trace");
+      const { mkdirSync } = require("node:fs");
+      mkdirSync(configDir, { recursive: true });
+      writeFileSync(
+        join(configDir, "config.json"),
+        JSON.stringify({ ignore: ["**/*.secret"], ignoreMode: "redact" }),
+      );
+
+      // Pre-hook
+      hook(
+        "claude",
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          session_id: "snap-redact",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-redact",
+        },
+        gitDir,
+      );
+
+      // Create ignored file
+      writeFileSync(join(gitDir, "secret.secret"), "password=abc\n");
+      // Create normal file
+      writeFileSync(join(gitDir, "normal.ts"), "const y = 1;\n");
+
+      // Post-hook
+      hook(
+        "claude",
+        {
+          hook_event_name: "PostToolUse",
+          tool_name: "Bash",
+          tool_input: { command: "echo edit" },
+          session_id: "snap-redact",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-redact",
+        },
+        gitDir,
+      );
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      const snapshotTraces = traces.filter(
+        (t: any) => t.metadata?.["dev.agent-trace.source"] === "vcs_snapshot",
+      );
+
+      // Normal file should have ranges
+      const normalTrace = snapshotTraces.find(
+        (t: any) => t.files?.[0]?.path === "normal.ts",
+      );
+      expect(normalTrace).toBeDefined();
+      expect(
+        (normalTrace as any).files[0].conversations[0].ranges.length,
+      ).toBeGreaterThanOrEqual(1);
+
+      // Secret file should be redacted (ranges empty, redacted flag set)
+      const secretTrace = snapshotTraces.find(
+        (t: any) => t.files?.[0]?.path === "secret.secret",
+      );
+      if (secretTrace) {
+        expect((secretTrace as any).metadata.redacted).toBe(true);
+        expect(
+          (secretTrace as any).files[0].conversations[0].ranges,
+        ).toHaveLength(0);
+      }
+    });
+
+    test("cursor beforeShellExecution + file change + afterShellExecution produces snapshot file_edit", () => {
+      const pre = hook(
+        "cursor",
+        {
+          hook_event_name: "beforeShellExecution",
+          session_id: "snap-cursor-1",
+          model: "gpt-4",
+          generation_id: "gen-snap-1",
+        },
+        gitDir,
+      );
+      expect(pre.exitCode).toBe(0);
+
+      writeFileSync(join(gitDir, "cursor-created.ts"), "const c = 99;\n");
+
+      const post = hook(
+        "cursor",
+        {
+          hook_event_name: "afterShellExecution",
+          session_id: "snap-cursor-1",
+          model: "gpt-4",
+          generation_id: "gen-snap-1",
+        },
+        gitDir,
+      );
+      expect(post.exitCode).toBe(0);
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      const fileEditTrace = traces.find(
+        (t: any) =>
+          t.files?.[0]?.path === "cursor-created.ts" &&
+          t.metadata?.["dev.agent-trace.source"] === "vcs_snapshot",
+      );
+      expect(fileEditTrace).toBeDefined();
+    });
+
+    test("PreToolUse + file change + PostToolUseFailure produces snapshot edits and failure shell", () => {
+      const pre = hook(
+        "claude",
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          session_id: "snap-fail-with-pre",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-fail-pre",
+        },
+        gitDir,
+      );
+      expect(pre.exitCode).toBe(0);
+
+      writeFileSync(join(gitDir, "partial-fail.ts"), "partial write\n");
+
+      const post = hook(
+        "claude",
+        {
+          hook_event_name: "PostToolUseFailure",
+          tool_name: "Bash",
+          tool_input: { command: "failing-cmd" },
+          session_id: "snap-fail-with-pre",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-fail-pre",
+        },
+        gitDir,
+      );
+      expect(post.exitCode).toBe(0);
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      const fileEdit = traces.find(
+        (t: any) =>
+          t.files?.[0]?.path === "partial-fail.ts" &&
+          t.metadata?.["dev.agent-trace.source"] === "vcs_snapshot",
+      );
+      expect(fileEdit).toBeDefined();
+
+      const failureShell = traces.find(
+        (t: any) =>
+          t.metadata?.["dev.agent-trace.failure"] === true &&
+          t.files?.[0]?.path === ".shell-history",
+      );
+      expect(failureShell).toBeDefined();
+    });
+
+    test("PostToolUseFailure with missing pre-snapshot emits synthetic failure shell", () => {
+      // No PreToolUse — simulate lost pre-snapshot
+      const post = hook(
+        "claude",
+        {
+          hook_event_name: "PostToolUseFailure",
+          tool_name: "Bash",
+          tool_input: { command: "failing-cmd" },
+          session_id: "snap-fail",
+          model: "claude-sonnet-4-5-20250929",
+          tool_use_id: "tu-fail-missing",
+        },
+        gitDir,
+      );
+      expect(post.exitCode).toBe(0);
+
+      const traces = readJsonl(join(gitDir, ".agent-trace", "traces.jsonl"));
+      const failureShell = traces.find(
+        (t: any) =>
+          t.metadata?.["dev.agent-trace.failure"] === true &&
+          t.files?.[0]?.path === ".shell-history",
+      );
+      expect(failureShell).toBeDefined();
     });
   });
 

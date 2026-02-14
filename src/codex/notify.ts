@@ -94,6 +94,12 @@ export async function handleNotify(jsonArg: string): Promise<number> {
     process.env.AGENT_TRACE_WORKSPACE_ROOT = payload.cwd;
   }
 
+  const { isInitialized } = await import("../core/ignore");
+  const { getWorkspaceRoot } = await import("../core/trace-store");
+  if (!isInitialized(getWorkspaceRoot())) {
+    return 0;
+  }
+
   const rolloutPath = await waitForRollout(threadId);
   if (!rolloutPath) {
     console.error(
@@ -113,7 +119,7 @@ export async function handleNotify(jsonArg: string): Promise<number> {
   const lines = content.split("\n").filter((l) => l.trim());
   if (lines.length === 0) return 0;
 
-  const ingestor = new CodexTraceIngestor(rolloutPath);
+  const ingestor = new CodexTraceIngestor({ transcriptPath: rolloutPath });
   if (prior?.ingestor) {
     ingestor.restoreState(prior.ingestor);
   }

@@ -65,6 +65,7 @@ export function installClaude(
   ensureClaudeCommandGroup(hooks, "SessionStart", command);
   ensureClaudeCommandGroup(hooks, "SessionEnd", command);
   ensureClaudeCommandGroup(hooks, "UserPromptSubmit", command);
+  ensureClaudeCommandGroup(hooks, "PreToolUse", command, "Bash");
   ensureClaudeCommandGroup(hooks, "PostToolUse", command, "Write|Edit");
   ensureClaudeCommandGroup(hooks, "PostToolUse", command, "Bash");
   ensureClaudeCommandGroup(

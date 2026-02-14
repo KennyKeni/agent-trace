@@ -1,4 +1,8 @@
-import type { HookInput, TraceEvent } from "../core/types";
+import type {
+  HookInput,
+  ShellSnapshotCapability,
+  TraceEvent,
+} from "../core/types";
 import { textFromUnknown } from "../core/utils";
 import { normalizeModelId, sessionIdFor } from "./utils";
 
@@ -24,12 +28,27 @@ export interface ClaudeHookInput extends HookInput {
 
 export { sessionIdFor } from "./utils";
 
+export const shellSnapshot: ShellSnapshotCapability = {
+  pre: [{ hookEvent: "PreToolUse", toolNames: ["Bash"] }],
+  post: [
+    { hookEvent: "PostToolUse", toolNames: ["Bash"] },
+    { hookEvent: "PostToolUseFailure", toolNames: ["Bash"], failure: true },
+  ],
+  callId: (input) => {
+    const id = (input as ClaudeHookInput).tool_use_id;
+    return typeof id === "string" && id ? id : undefined;
+  },
+};
+
 export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
   const ci = input as ClaudeHookInput;
   const sessionId = sessionIdFor(input);
   const model = normalizeModelId(input.model);
 
   switch (input.hook_event_name) {
+    case "PreToolUse":
+      return undefined;
+
     case "PostToolUse": {
       const toolName = ci.tool_name ?? "";
       const isFileEdit = toolName === "Write" || toolName === "Edit";

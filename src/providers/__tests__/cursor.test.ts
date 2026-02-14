@@ -50,8 +50,10 @@ describe("cursor adapt – beforeSubmitPrompt", () => {
     expect(result).toMatchObject({
       kind: "message",
       provider: "cursor",
+      sessionId: "test-session",
       role: "user",
       content: "hello from prompt",
+      eventName: "beforeSubmitPrompt",
     });
   });
 
@@ -106,10 +108,13 @@ describe("cursor adapt – afterFileEdit", () => {
     expect(result).toMatchObject({
       kind: "file_edit",
       provider: "cursor",
+      sessionId: "test-session",
       filePath: "/tmp/test.ts",
       edits: [{ old_string: "old", new_string: "new" }],
       readContent: true,
       model: "openai/gpt-4",
+      eventName: "afterFileEdit",
+      transcript: "/tmp/transcript.json",
     });
   });
 
@@ -141,7 +146,9 @@ describe("cursor adapt – afterTabFileEdit", () => {
     );
     expect(result).toMatchObject({
       kind: "file_edit",
+      sessionId: "test-session",
       filePath: "/tmp/tab.ts",
+      eventName: "afterTabFileEdit",
     });
     const event = result as { readContent?: boolean };
     expect(event.readContent).toBeUndefined();
@@ -168,6 +175,7 @@ describe("cursor adapt – afterShellExecution", () => {
     expect(result).toMatchObject({
       kind: "shell",
       provider: "cursor",
+      sessionId: "test-session",
       model: "openai/gpt-4",
       transcript: "/tmp/transcript.json",
       meta: {
@@ -175,6 +183,7 @@ describe("cursor adapt – afterShellExecution", () => {
         duration_ms: 1500,
       },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 });
 
@@ -190,11 +199,14 @@ describe("cursor adapt – sessionStart", () => {
     expect(result).toMatchObject({
       kind: "session_start",
       provider: "cursor",
+      sessionId: "test-session",
       meta: {
+        session_id: "test-session",
         is_background_agent: true,
         composer_mode: "agent",
       },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 });
 
@@ -210,11 +222,23 @@ describe("cursor adapt – sessionEnd", () => {
     expect(result).toMatchObject({
       kind: "session_end",
       provider: "cursor",
+      sessionId: "test-session",
       meta: {
+        session_id: "test-session",
         reason: "completed",
         duration_ms: 60000,
       },
     });
+    expect(result).not.toHaveProperty("eventName");
+  });
+});
+
+describe("cursor adapt – beforeShellExecution", () => {
+  test("returns undefined for beforeShellExecution", () => {
+    const result = adapt(
+      makeInput({ hook_event_name: "beforeShellExecution" }),
+    );
+    expect(result).toBeUndefined();
   });
 });
 
@@ -222,5 +246,58 @@ describe("cursor adapt – unknown event", () => {
   test("returns undefined", () => {
     const result = adapt(makeInput({ hook_event_name: "unknownEvent" }));
     expect(result).toBeUndefined();
+  });
+});
+
+describe("cursor adapt – session continuity", () => {
+  const eventInputs = [
+    makeInput({ hook_event_name: "sessionStart", session_id: "cont-1" }),
+    makeInput({
+      hook_event_name: "afterFileEdit",
+      session_id: "cont-1",
+      file_path: "/tmp/f.ts",
+    }),
+    makeInput({
+      hook_event_name: "afterShellExecution",
+      session_id: "cont-1",
+      command: "ls",
+    }),
+    makeInput({
+      hook_event_name: "beforeSubmitPrompt",
+      session_id: "cont-1",
+      prompt: "hi",
+    }),
+    makeInput({
+      hook_event_name: "sessionEnd",
+      session_id: "cont-1",
+      reason: "done",
+    }),
+  ];
+
+  test("same sessionId across all event types", () => {
+    for (const input of eventInputs) {
+      const result = adapt(input);
+      if (!result) continue;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        expect(ev.sessionId).toBe("cont-1");
+      }
+    }
+  });
+
+  test("fallback to generation_id is consistent", () => {
+    const inputs = eventInputs.map((i) => ({
+      ...i,
+      session_id: undefined,
+      generation_id: "gen-1",
+    }));
+    for (const input of inputs) {
+      const result = adapt(input as any);
+      if (!result) continue;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        expect(ev.sessionId).toBe("gen-1");
+      }
+    }
   });
 });

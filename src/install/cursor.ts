@@ -16,6 +16,7 @@ export function installCursor(
     "sessionStart",
     "sessionEnd",
     "beforeSubmitPrompt",
+    "beforeShellExecution",
     "afterFileEdit",
     "afterTabFileEdit",
     "afterShellExecution",

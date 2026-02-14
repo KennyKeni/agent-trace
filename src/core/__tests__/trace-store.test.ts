@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { computeRangePositions, toRelativePath } from "../trace-store";
+import {
+  computeRangePositions,
+  createTrace,
+  toRelativePath,
+} from "../trace-store";
 
 describe("toRelativePath", () => {
   test("converts in-root absolute paths to repo-relative paths", () => {
@@ -86,5 +90,36 @@ describe("computeRangePositions", () => {
     expect(positions[0]?.start_line).toBe(10);
     expect(positions[0]?.end_line).toBe(15);
     expect(positions[0]?.content_hash).toMatch(/^murmur3:[0-9a-f]{8}$/);
+  });
+});
+
+describe("createTrace with snapshotRanges", () => {
+  test("uses provided rangePositions directly (snapshotRanges path)", () => {
+    const snapshotRanges = [
+      { start_line: 5, end_line: 10 },
+      { start_line: 20, end_line: 25 },
+    ];
+    const trace = createTrace("ai", "src/test.ts", {
+      rangePositions: snapshotRanges,
+      model: "test-model",
+      metadata: { "dev.agent-trace.source": "vcs_snapshot" },
+    });
+    expect(trace).toBeDefined();
+    const ranges = trace?.files[0]?.conversations[0]?.ranges;
+    expect(ranges).toHaveLength(2);
+    expect(ranges?.[0]?.start_line).toBe(5);
+    expect(ranges?.[0]?.end_line).toBe(10);
+    expect(ranges?.[1]?.start_line).toBe(20);
+    expect(ranges?.[1]?.end_line).toBe(25);
+  });
+
+  test("snapshotRanges without content_hash omits it from ranges", () => {
+    const snapshotRanges = [{ start_line: 1, end_line: 3 }];
+    const trace = createTrace("ai", "src/test.ts", {
+      rangePositions: snapshotRanges,
+    });
+    expect(trace).toBeDefined();
+    const range = trace?.files[0]?.conversations[0]?.ranges[0];
+    expect(range?.content_hash).toBeUndefined();
   });
 });

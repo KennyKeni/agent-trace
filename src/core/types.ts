@@ -22,6 +22,8 @@ export interface HookInput {
   conversation_id?: string;
   generation_id?: string;
   transcript_path?: string | null;
+  tool_name?: string;
+  tool_input?: Record<string, unknown>;
 }
 
 export type TraceEvent =
@@ -31,6 +33,9 @@ export type TraceEvent =
       sessionId?: string;
       filePath: string;
       edits: FileEdit[];
+      snapshotRanges?: RangePosition[];
+      hunkPatch?: string;
+      precomputedPatch?: string;
       model?: string;
       transcript?: string | null;
       readContent?: boolean;
@@ -76,10 +81,23 @@ export type TraceEvent =
       meta: Record<string, unknown>;
     };
 
+export interface ShellMatcher {
+  hookEvent: string;
+  toolNames?: string[];
+  failure?: boolean;
+}
+
+export interface ShellSnapshotCapability {
+  pre: ShellMatcher[];
+  post: ShellMatcher[];
+  callId?: (input: HookInput) => string | undefined;
+}
+
 export interface ProviderAdapter {
   adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined;
   sessionIdFor(input: HookInput): string | undefined;
   toolInfo?(): { name: string; version?: string };
+  shellSnapshot?: ShellSnapshotCapability;
 }
 
 export interface Extension {

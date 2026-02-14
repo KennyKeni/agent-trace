@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { appendLineHashes } from "../line-hashes";
+import { appendLineHashes, appendLineHashesFromPatch } from "../line-hashes";
 
 const TMP_ROOT = join(import.meta.dir, "__tmp_line_hashes__");
 
@@ -206,5 +206,134 @@ describe("appendLineHashes", () => {
     }>;
     expect(records[0]?.hashes).toHaveLength(3);
     expect(records[0]?.hashes?.[1]).toMatch(/^murmur3:[0-9a-f]{8}$/);
+  });
+});
+
+describe("appendLineHashesFromPatch", () => {
+  test("hashes added lines from patch text", () => {
+    const patch = [
+      "diff --git a/new.ts b/new.ts",
+      "--- /dev/null",
+      "+++ b/new.ts",
+      "@@ -0,0 +1,3 @@",
+      "+line one",
+      "+line two",
+      "+line three",
+    ].join("\n");
+
+    appendLineHashesFromPatch(
+      "test",
+      "patch-sess",
+      "new.ts",
+      "PostToolUse",
+      patch,
+      [{ start_line: 1, end_line: 3 }],
+      TMP_ROOT,
+    );
+
+    const records = readRecords("test", "patch-sess") as Array<{
+      hashes: string[];
+      start_line: number;
+      end_line: number;
+      file: string;
+    }>;
+    expect(records).toHaveLength(1);
+    expect(records[0]?.hashes).toHaveLength(3);
+    expect(records[0]?.start_line).toBe(1);
+    expect(records[0]?.end_line).toBe(3);
+    expect(records[0]?.file).toBe("new.ts");
+    for (const hash of records[0]?.hashes ?? []) {
+      expect(hash).toMatch(/^murmur3:[0-9a-f]{8}$/);
+    }
+  });
+
+  test("ignores --- and +++ header lines before first hunk", () => {
+    const patch = [
+      "--- a/file.ts",
+      "+++ b/file.ts",
+      "@@ -0,0 +1,1 @@",
+      "+actual content",
+    ].join("\n");
+
+    appendLineHashesFromPatch(
+      "test",
+      "patch-sess2",
+      "file.ts",
+      "PostToolUse",
+      patch,
+      [{ start_line: 1, end_line: 1 }],
+      TMP_ROOT,
+    );
+
+    const records = readRecords("test", "patch-sess2") as Array<{
+      hashes: string[];
+    }>;
+    expect(records).toHaveLength(1);
+    expect(records[0]?.hashes).toHaveLength(1);
+  });
+
+  test("emits one record per range with per-hunk hashes", () => {
+    const patch = [
+      "diff --git a/file.ts b/file.ts",
+      "--- a/file.ts",
+      "+++ b/file.ts",
+      "@@ -1,2 +1,3 @@",
+      " existing",
+      "+alpha",
+      " more",
+      "@@ -10,2 +11,4 @@",
+      " context",
+      "+beta",
+      "+gamma",
+      " end",
+    ].join("\n");
+
+    appendLineHashesFromPatch(
+      "test",
+      "patch-sess3",
+      "file.ts",
+      "PostToolUse",
+      patch,
+      [
+        { start_line: 1, end_line: 3 },
+        { start_line: 11, end_line: 14 },
+      ],
+      TMP_ROOT,
+    );
+
+    const records = readRecords("test", "patch-sess3") as Array<{
+      start_line: number;
+      end_line: number;
+      hashes: string[];
+    }>;
+    expect(records).toHaveLength(2);
+    expect(records[0]?.start_line).toBe(1);
+    expect(records[0]?.hashes).toHaveLength(1);
+    expect(records[1]?.start_line).toBe(11);
+    expect(records[1]?.hashes).toHaveLength(2);
+  });
+
+  test("hashes added lines starting with ++ inside hunks", () => {
+    const patch = [
+      "@@ -0,0 +1,2 @@",
+      "+normal line",
+      "++++triple plus content",
+    ].join("\n");
+
+    appendLineHashesFromPatch(
+      "test",
+      "patch-sess4",
+      "file.ts",
+      "PostToolUse",
+      patch,
+      [{ start_line: 1, end_line: 2 }],
+      TMP_ROOT,
+    );
+
+    const records = readRecords("test", "patch-sess4") as Array<{
+      hashes: string[];
+    }>;
+    expect(records).toHaveLength(1);
+    expect(records[0]?.hashes).toHaveLength(2);
   });
 });

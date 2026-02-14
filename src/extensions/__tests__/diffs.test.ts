@@ -1,5 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { createPatchFromStrings } from "../diffs";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { appendDiffArtifact, createPatchFromStrings } from "../diffs";
 
 describe("createPatchFromStrings", () => {
   it("returns undefined for identical strings", () => {
@@ -95,5 +97,52 @@ describe("createPatchFromStrings", () => {
     expect(patch).toContain("-line2");
     expect(patch).toContain("+changed");
     expect(patch).not.toContain("\r");
+  });
+});
+
+const TMP_ROOT = join(import.meta.dir, "__tmp_diffs__");
+
+describe("appendDiffArtifact (precomputedPatch path)", () => {
+  beforeEach(() => {
+    if (existsSync(TMP_ROOT)) rmSync(TMP_ROOT, { recursive: true });
+    mkdirSync(TMP_ROOT, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (existsSync(TMP_ROOT)) rmSync(TMP_ROOT, { recursive: true });
+  });
+
+  it("writes precomputed patch text directly to artifact", () => {
+    const precomputedPatch = [
+      "diff --git a/new-file.ts b/new-file.ts",
+      "--- /dev/null",
+      "+++ b/new-file.ts",
+      "@@ -0,0 +1,2 @@",
+      "+const x = 1;",
+      "+const y = 2;",
+    ].join("\n");
+
+    appendDiffArtifact(
+      "claude",
+      "snap-sess",
+      "new-file.ts",
+      "PostToolUse",
+      precomputedPatch,
+      TMP_ROOT,
+    );
+
+    const path = join(
+      TMP_ROOT,
+      ".agent-trace",
+      "diffs",
+      "claude",
+      "snap-sess.patch",
+    );
+    expect(existsSync(path)).toBe(true);
+    const content = readFileSync(path, "utf-8");
+    expect(content).toContain("+const x = 1;");
+    expect(content).toContain("+const y = 2;");
+    expect(content).toContain("event=PostToolUse");
+    expect(content).toContain("file=new-file.ts");
   });
 });

@@ -1,4 +1,9 @@
-import type { FileEdit, HookInput, TraceEvent } from "../core/types";
+import type {
+  FileEdit,
+  HookInput,
+  ShellSnapshotCapability,
+  TraceEvent,
+} from "../core/types";
 import { maybeString, safeRecord, textFromUnknown } from "../core/utils";
 import { normalizeModelId } from "./utils";
 
@@ -29,6 +34,17 @@ function extractEventField(
   }
   return undefined;
 }
+
+const SHELL_TOOL_NAMES = ["bash", "shell", "Bash"];
+
+export const shellSnapshot: ShellSnapshotCapability = {
+  pre: [{ hookEvent: "hook:tool.execute.before", toolNames: SHELL_TOOL_NAMES }],
+  post: [{ hookEvent: "hook:tool.execute.after", toolNames: SHELL_TOOL_NAMES }],
+  callId: (input) => {
+    const id = (input as OpenCodeHookInput).call_id;
+    return typeof id === "string" && id ? id : undefined;
+  },
+};
 
 export function sessionIdFor(input: HookInput): string | undefined {
   const oi = input as OpenCodeHookInput;
@@ -116,26 +132,6 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
       };
     }
 
-    case "command.executed": {
-      const event = safeRecord(oi.event);
-      if (!event) return undefined;
-      return {
-        kind: "shell",
-        provider: "opencode",
-        sessionId,
-        model,
-        transcript: input.transcript_path,
-        meta: {
-          event: "command.executed",
-          session_id: sessionId,
-          source: "opencode",
-          command: extractEventField(event, ["name", "command", "cmd"]),
-          arguments: extractEventField(event, ["arguments"]),
-          messageID: extractEventField(event, ["messageID"]),
-        },
-      };
-    }
-
     case "file.edited": {
       const event = safeRecord(oi.event);
       if (!event) return undefined;
@@ -179,6 +175,9 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
         },
       };
     }
+
+    case "hook:tool.execute.before":
+      return undefined;
 
     case "hook:tool.execute.after": {
       const toolName = oi.tool_name ?? "";

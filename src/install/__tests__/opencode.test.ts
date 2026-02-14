@@ -61,6 +61,16 @@ describe("generated OpenCode plugin", () => {
   test("filters .agent-trace/ paths in tool handler", () => {
     expect(pluginSource).toContain('.startsWith(".agent-trace/")');
   });
+
+  test("tool.execute.before emits hook:tool.execute.before with call_id and session_id", () => {
+    expect(pluginSource).toContain('"hook:tool.execute.before"');
+    expect(pluginSource).toContain("call_id: input.callID");
+    expect(pluginSource).toContain("session_id: input.sessionID");
+  });
+
+  test("tool.execute.after shell branch includes call_id", () => {
+    expect(pluginSource).toContain("call_id: input.callID");
+  });
 });
 
 describe("installOpenCode replaces placeholder", () => {

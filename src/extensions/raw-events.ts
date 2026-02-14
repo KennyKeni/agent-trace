@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { registerExtension } from "../core/trace-hook";
 import { getWorkspaceRoot } from "../core/trace-store";
 import { appendJsonl, nowIso, sanitizeSessionId } from "./helpers";
 
@@ -22,9 +21,9 @@ export function appendRawEvent(
   return path;
 }
 
-registerExtension({
+export const rawEventsExtension = {
   name: "raw-events",
-  onRawInput(provider, sessionId, input) {
+  onRawInput(provider: string, sessionId: string | undefined, input: unknown) {
     appendRawEvent(provider, sessionId, input);
   },
-});
+};

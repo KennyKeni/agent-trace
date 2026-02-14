@@ -60,6 +60,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bunx @kennykeni/agent-trace hook --provider claude"
+          }
+        ]
+      }
     ]
   }
 }

@@ -50,8 +50,10 @@ describe("claude adapt – UserPromptSubmit", () => {
     expect(result).toMatchObject({
       kind: "message",
       provider: "claude",
+      sessionId: "test-session",
       role: "user",
       content: "hello from prompt",
+      eventName: "UserPromptSubmit",
     });
   });
 
@@ -106,6 +108,18 @@ describe("claude adapt – UserPromptSubmit", () => {
   });
 });
 
+describe("claude adapt – PreToolUse", () => {
+  test("returns undefined for PreToolUse", () => {
+    const result = adapt(
+      makeInput({
+        hook_event_name: "PreToolUse",
+        tool_name: "Bash",
+      }),
+    );
+    expect(result).toBeUndefined();
+  });
+});
+
 describe("claude adapt – PostToolUse (Bash)", () => {
   test("returns shell event", () => {
     const result = adapt(
@@ -119,13 +133,29 @@ describe("claude adapt – PostToolUse (Bash)", () => {
     expect(result).toMatchObject({
       kind: "shell",
       provider: "claude",
+      sessionId: "test-session",
       model: "anthropic/claude-sonnet-4-5-20250929",
       meta: {
+        session_id: "test-session",
         tool_name: "Bash",
         tool_use_id: "tu-1",
         command: "ls -la",
       },
     });
+    expect(result).not.toHaveProperty("eventName");
+    expect((result as any).transcript).toBeUndefined();
+  });
+
+  test("passes transcript when provided", () => {
+    const result = adapt(
+      makeInput({
+        hook_event_name: "PostToolUse",
+        tool_name: "Bash",
+        tool_input: { command: "echo hi" },
+        transcript_path: "/tmp/transcript.json",
+      }),
+    );
+    expect(result).toMatchObject({ transcript: "/tmp/transcript.json" });
   });
 });
 
@@ -141,9 +171,12 @@ describe("claude adapt – PostToolUse (Write)", () => {
     expect(result).toMatchObject({
       kind: "file_edit",
       provider: "claude",
+      sessionId: "test-session",
       filePath: "/tmp/test.ts",
       edits: [{ old_string: "", new_string: "new file content" }],
       readContent: true,
+      eventName: "PostToolUse",
+      meta: { session_id: "test-session", tool_name: "Write" },
     });
   });
 
@@ -158,6 +191,18 @@ describe("claude adapt – PostToolUse (Write)", () => {
     expect(result).toMatchObject({
       model: "anthropic/claude-sonnet-4-5-20250929",
     });
+  });
+
+  test("passes transcript when provided", () => {
+    const result = adapt(
+      makeInput({
+        hook_event_name: "PostToolUse",
+        tool_name: "Write",
+        tool_input: { file_path: "/tmp/t.ts", content: "x" },
+        transcript_path: "/tmp/transcript.json",
+      }),
+    );
+    expect(result).toMatchObject({ transcript: "/tmp/transcript.json" });
   });
 });
 
@@ -176,7 +221,9 @@ describe("claude adapt – PostToolUse (Edit)", () => {
     );
     expect(result).toMatchObject({
       kind: "file_edit",
+      eventName: "PostToolUse",
       edits: [{ old_string: "old", new_string: "new" }],
+      meta: { session_id: "test-session", tool_name: "Edit" },
     });
   });
 
@@ -244,8 +291,9 @@ describe("claude adapt – SessionStart", () => {
       kind: "session_start",
       provider: "claude",
       sessionId: "test-session",
-      meta: { source: "cli" },
+      meta: { session_id: "test-session", source: "cli" },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 
   test("uses normalized model", () => {
@@ -268,8 +316,9 @@ describe("claude adapt – SessionEnd", () => {
       kind: "session_end",
       provider: "claude",
       sessionId: "test-session",
-      meta: { reason: "user_exit" },
+      meta: { session_id: "test-session", reason: "user_exit" },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 
   test("uses normalized model", () => {
@@ -306,5 +355,64 @@ describe("normalizeModelId via adapt", () => {
   test("normalizes o4-mini model", () => {
     const result = adapt(makeInput({ prompt: "hi", model: "o4-mini" }));
     expect(result).toMatchObject({ model: "openai/o4-mini" });
+  });
+});
+
+describe("claude adapt – session continuity", () => {
+  const eventInputs = [
+    makeInput({
+      hook_event_name: "SessionStart",
+      session_id: "cont-1",
+      source: "cli",
+    }),
+    makeInput({
+      hook_event_name: "PostToolUse",
+      session_id: "cont-1",
+      tool_name: "Edit",
+      tool_input: { file_path: "/tmp/f.ts", new_string: "x" },
+    }),
+    makeInput({
+      hook_event_name: "PostToolUse",
+      session_id: "cont-1",
+      tool_name: "Bash",
+      tool_input: { command: "echo hi" },
+    }),
+    makeInput({
+      hook_event_name: "UserPromptSubmit",
+      session_id: "cont-1",
+      prompt: "hi",
+    }),
+    makeInput({
+      hook_event_name: "SessionEnd",
+      session_id: "cont-1",
+      reason: "done",
+    }),
+  ];
+
+  test("same sessionId across all event types", () => {
+    for (const input of eventInputs) {
+      const result = adapt(input);
+      if (!result) continue;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        expect(ev.sessionId).toBe("cont-1");
+      }
+    }
+  });
+
+  test("fallback to conversation_id is consistent", () => {
+    const inputs = eventInputs.map((i) => ({
+      ...i,
+      session_id: undefined,
+      conversation_id: "conv-1",
+    }));
+    for (const input of inputs) {
+      const result = adapt(input as any);
+      if (!result) continue;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        expect(ev.sessionId).toBe("conv-1");
+      }
+    }
   });
 });

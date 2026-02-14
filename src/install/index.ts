@@ -4,6 +4,7 @@ import { installConfig } from "./config";
 import { installCursor } from "./cursor";
 import { installOpenCode } from "./opencode";
 import type { ChangeSummary, InstallOptions } from "./types";
+import { installIgnoreEntry } from "./vcs-ignore";
 
 export { InstallError, parseArgs } from "./args";
 export type { ChangeSummary, InstallOptions } from "./types";
@@ -16,6 +17,7 @@ export function install(options: InstallOptions): ChangeSummary[] {
   }
 
   for (const targetRoot of options.targetRoots) {
+    changes.push(installIgnoreEntry(targetRoot, options.dryRun));
     changes.push(installConfig(targetRoot, options.dryRun));
 
     if (options.providers.includes("cursor")) {

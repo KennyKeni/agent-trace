@@ -127,11 +127,18 @@ export const AgentTracePlugin = async ({
       output: { args: Record<string, unknown> },
     ) => {
       const shellTools = ["bash", "shell"];
-      if (
-        shellTools.includes(input.tool) &&
-        typeof output?.args?.command === "string"
-      ) {
-        pendingCommands.set(input.callID, output.args.command);
+      if (shellTools.includes(input.tool)) {
+        if (typeof output?.args?.command === "string") {
+          pendingCommands.set(input.callID, output.args.command);
+        }
+        await emitToAgentTrace(root, {
+          hook_event_name: "hook:tool.execute.before",
+          provider: "opencode",
+          session_id: input.sessionID,
+          cwd: root,
+          tool_name: input.tool,
+          call_id: input.callID,
+        });
       }
     },
 
@@ -167,6 +174,7 @@ export const AgentTracePlugin = async ({
           session_id: input.sessionID,
           cwd: root,
           tool_name: toolName,
+          call_id: input.callID,
           command,
         });
         return;

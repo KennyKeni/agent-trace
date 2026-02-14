@@ -14,6 +14,9 @@ function rolloutLine(type: string, payload: Record<string, unknown>): string {
 beforeEach(() => {
   mkdirSync(PROJECT_DIR, { recursive: true });
   mkdirSync(CODEX_HOME, { recursive: true });
+  const configDir = join(PROJECT_DIR, ".agent-trace");
+  mkdirSync(configDir, { recursive: true });
+  writeFileSync(join(configDir, "config.json"), "{}", "utf-8");
   process.env.CODEX_HOME = CODEX_HOME;
   process.env.AGENT_TRACE_WORKSPACE_ROOT = PROJECT_DIR;
 });

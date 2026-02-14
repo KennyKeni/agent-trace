@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SPEC_VERSION = "0.1.0";
+export const SPEC_VERSION = "0.1";
 
 export const ContributorTypeSchema = z.enum([
   "human",
@@ -9,7 +9,7 @@ export const ContributorTypeSchema = z.enum([
   "unknown",
 ]);
 
-export const ToolSchema = z.object({
+const ToolSchema = z.object({
   name: z
     .string()
     .optional()
@@ -17,7 +17,7 @@ export const ToolSchema = z.object({
   version: z.string().optional().describe("Version of the tool"),
 });
 
-export const ContributorSchema = z.object({
+const ContributorSchema = z.object({
   type: ContributorTypeSchema.describe("The type of contributor"),
   model_id: z
     .string()
@@ -28,24 +28,28 @@ export const ContributorSchema = z.object({
     ),
 });
 
-export const RelatedResourceSchema = z.object({
+const RelatedResourceSchema = z.object({
   type: z.string().describe("Type of related resource"),
   url: z.string().url().describe("URL to the related resource"),
 });
 
-export const RangeSchema = z.object({
-  start_line: z.number().int().min(1).describe("1-indexed start line number"),
-  end_line: z.number().int().min(1).describe("1-indexed end line number"),
-  content_hash: z
-    .string()
-    .optional()
-    .describe("Hash of attributed content for position-independent tracking"),
-  contributor: ContributorSchema.optional().describe(
-    "Override contributor for this specific range (e.g., for agent handoffs)",
-  ),
-});
+export const RangeSchema = z
+  .object({
+    start_line: z.number().int().min(1).describe("1-indexed start line number"),
+    end_line: z.number().int().min(1).describe("1-indexed end line number"),
+    content_hash: z
+      .string()
+      .optional()
+      .describe("Hash of attributed content for position-independent tracking"),
+    contributor: ContributorSchema.optional().describe(
+      "Override contributor for this specific range (e.g., for agent handoffs)",
+    ),
+  })
+  .refine((r) => r.start_line <= r.end_line, {
+    message: "start_line must be <= end_line",
+  });
 
-export const ConversationSchema = z.object({
+const ConversationSchema = z.object({
   url: z
     .string()
     .url()
@@ -63,16 +67,16 @@ export const ConversationSchema = z.object({
     .describe("Other related resources"),
 });
 
-export const FileSchema = z.object({
+const FileSchema = z.object({
   path: z.string().describe("Relative file path from repository root"),
   conversations: z
     .array(ConversationSchema)
     .describe("Array of conversations that contributed to this file"),
 });
 
-export const VcsTypeSchema = z.enum(["git", "jj", "hg", "svn"]);
+const VcsTypeSchema = z.enum(["git", "jj", "hg", "svn"]);
 
-export const VcsSchema = z.object({
+const VcsSchema = z.object({
   type: VcsTypeSchema.describe(
     "Version control system type (e.g., 'git', 'jj', 'hg')",
   ),
@@ -86,8 +90,8 @@ export const VcsSchema = z.object({
 export const TraceRecordSchema = z.object({
   version: z
     .string()
-    .regex(/^[0-9]+\.[0-9]+\.[0-9]+$/)
-    .describe("Agent Trace specification version (e.g., '0.1.0')"),
+    .regex(/^[0-9]+\.[0-9]+$/)
+    .describe("Agent Trace specification version (e.g., '0.1')"),
   id: z.string().uuid().describe("Unique identifier for this trace record"),
   timestamp: z
     .string()
@@ -109,10 +113,6 @@ export const TraceRecordSchema = z.object({
 export type ContributorType = z.infer<typeof ContributorTypeSchema>;
 export type VcsType = z.infer<typeof VcsTypeSchema>;
 export type Vcs = z.infer<typeof VcsSchema>;
-export type Tool = z.infer<typeof ToolSchema>;
-export type Contributor = z.infer<typeof ContributorSchema>;
 export type Range = z.infer<typeof RangeSchema>;
 export type Conversation = z.infer<typeof ConversationSchema>;
-export type File = z.infer<typeof FileSchema>;
-export type RelatedResource = z.infer<typeof RelatedResourceSchema>;
 export type TraceRecord = z.infer<typeof TraceRecordSchema>;

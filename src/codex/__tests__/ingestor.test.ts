@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import "../../extensions";
 import {
@@ -16,6 +22,9 @@ function rolloutLine(type: string, payload: Record<string, unknown>): string {
 
 beforeEach(() => {
   mkdirSync(TEST_ROOT, { recursive: true });
+  const configDir = join(TEST_ROOT, ".agent-trace");
+  mkdirSync(configDir, { recursive: true });
+  writeFileSync(join(configDir, "config.json"), "{}", "utf-8");
   process.env.AGENT_TRACE_WORKSPACE_ROOT = TEST_ROOT;
 });
 

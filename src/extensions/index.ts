@@ -1,16 +1,12 @@
-import "./raw-events";
-import "./diffs";
-import "./messages";
-import "./line-hashes";
+import { registerExtension } from "../core/registry";
+import { diffsExtension } from "./diffs";
+import { lineHashesExtension } from "./line-hashes";
+import { messagesExtension } from "./messages";
+import { rawEventsExtension } from "./raw-events";
 
-export { appendDiffArtifact, createPatchFromStrings } from "./diffs";
-export {
-  appendJsonl,
-  ensureDir,
-  ensureParent,
-  nowIso,
-  sanitizeSessionId,
-} from "./helpers";
-export { appendLineHashes } from "./line-hashes";
-export { appendMessage, type MessageRecord } from "./messages";
-export { appendRawEvent } from "./raw-events";
+export function registerBuiltinExtensions(): void {
+  registerExtension(rawEventsExtension);
+  registerExtension(diffsExtension);
+  registerExtension(messagesExtension);
+  registerExtension(lineHashesExtension);
+}

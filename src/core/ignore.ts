@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { HookInput } from "./types";
 
-export type IgnoreMode = "redact" | "skip";
+type IgnoreMode = "redact" | "skip";
 
 export interface IgnoreConfig {
   useGitignore: boolean;
@@ -12,7 +12,7 @@ export interface IgnoreConfig {
   mode: IgnoreMode;
 }
 
-export interface AgentTraceConfig {
+interface AgentTraceConfig {
   extensions: string[] | null;
   ignore: IgnoreConfig;
 }
@@ -77,6 +77,10 @@ function extractIgnoreConfig(raw: RawConfig | null): IgnoreConfig {
       : [],
     mode: raw?.ignoreMode === "skip" ? "skip" : "redact",
   };
+}
+
+export function isInitialized(root: string): boolean {
+  return existsSync(join(root, ".agent-trace", "config.json"));
 }
 
 export function loadConfig(root: string): AgentTraceConfig {

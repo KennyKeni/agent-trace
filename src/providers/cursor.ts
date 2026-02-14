@@ -1,4 +1,9 @@
-import type { FileEdit, HookInput, TraceEvent } from "../core/types";
+import type {
+  FileEdit,
+  HookInput,
+  ShellSnapshotCapability,
+  TraceEvent,
+} from "../core/types";
 import { textFromUnknown } from "../core/utils";
 import { normalizeModelId, sessionIdFor } from "./utils";
 
@@ -18,12 +23,20 @@ export interface CursorHookInput extends HookInput {
 
 export { sessionIdFor } from "./utils";
 
+export const shellSnapshot: ShellSnapshotCapability = {
+  pre: [{ hookEvent: "beforeShellExecution" }],
+  post: [{ hookEvent: "afterShellExecution" }],
+};
+
 export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
   const ci = input as CursorHookInput;
   const sessionId = sessionIdFor(input);
   const model = normalizeModelId(input.model);
 
   switch (input.hook_event_name) {
+    case "beforeShellExecution":
+      return undefined;
+
     case "afterFileEdit": {
       if (!ci.file_path) return undefined;
       return {

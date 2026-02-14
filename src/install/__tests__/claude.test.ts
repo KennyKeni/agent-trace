@@ -33,8 +33,20 @@ describe("installClaude", () => {
     expect(hooks.SessionStart).toBeDefined();
     expect(hooks.SessionEnd).toBeDefined();
     expect(hooks.UserPromptSubmit).toBeDefined();
+    expect(hooks.PreToolUse).toBeDefined();
     expect(hooks.PostToolUse).toBeDefined();
     expect(hooks.PostToolUseFailure).toBeDefined();
+  });
+
+  test("PreToolUse has Bash matcher", () => {
+    installClaude(tmpDir, false);
+
+    const config = JSON.parse(
+      readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"),
+    );
+    const groups = config.hooks.PreToolUse as Array<{ matcher?: string }>;
+    expect(groups).toBeDefined();
+    expect(groups.some((g) => g.matcher === "Bash")).toBe(true);
   });
 
   test("PostToolUse has Write|Edit and Bash matchers", () => {

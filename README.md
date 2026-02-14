@@ -16,7 +16,7 @@ Supported providers:
 
 Requires [Bun](https://bun.sh).
 
-Install hooks in the current git repository:
+Install hooks in the current project (git recommended but not required):
 
 ```bash
 bunx @kennykeni/agent-trace init
@@ -64,9 +64,10 @@ Existing `config.json` files are never overwritten — only created when absent.
 
 1. Provider hooks fire on tool events (file edits, shell commands, session lifecycle).
 2. The hook receives event JSON on stdin and routes it through a provider adapter.
-3. The adapter normalizes provider-specific payloads into internal trace events.
-4. The trace pipeline converts events into spec-compliant trace records.
-5. Records are appended to `.agent-trace/traces.jsonl`.
+3. The adapter normalizes provider-specific payloads into internal trace events. This covers direct file edits (Write, Edit tools) using data from the provider's hook input.
+4. For shell commands, a VCS snapshot layer captures the working tree before and after execution via `git write-tree` + `git diff-tree`. Any file changes detected are emitted as additional trace events with line-level attribution. This requires a git repository; without one, only adapter-provided events are recorded.
+5. The trace pipeline converts events into spec-compliant trace records.
+6. Records are appended to `.agent-trace/traces.jsonl`.
 
 Additional artifacts are written by extensions under `.agent-trace/`:
 
@@ -137,7 +138,8 @@ Schema source: [`schemas.ts`](./src/core/schemas.ts)
 
 - **indexOf-based range attribution**: When the same text appears multiple times in a file, line-range attribution may point to the first occurrence rather than the actual edit location. Providers don't always supply line numbers, so `indexOf` is the best-effort fallback.
 - **Bun-only**: The hook runtime and CLI require Bun. Node.js is not supported.
-- **No VCS requirement**: Works without git. When git is available, traces include the current commit SHA. Without git, VCS info is omitted. `useGitignore` silently becomes a no-op in non-git repos.
+- **Git optional, but recommended**: agent-trace works without git, but with reduced coverage. File edits made through provider tools (Write, Edit, `afterFileEdit`) are always traced via adapter input regardless of git. File changes caused by shell commands (Bash, `npm install`, `sed`, etc.) are only detected when the project is a git repository (`git init`), because shell attribution uses `git write-tree` + `git diff-tree` snapshots. Without git, shell-induced file changes are untracked. VCS info (commit SHA) in traces is also omitted without git.
+- **Gitignored files not traced for shell edits**: VCS snapshot attribution uses `git add -A` which respects `.gitignore` rules. Shell-induced changes to gitignored files (build outputs, generated code) will not appear in snapshot diffs. Direct tool edits (Edit, Write) to those same files may still be traced, since provider hooks don't filter by `.gitignore`.
 - **Multi-file OpenCode events**: If any file in a `hook:tool.execute.after` payload is ignored, the entire raw event is redacted/skipped (conservative approach).
 - **`.env.*` matches broadly**: `**/.env.*` matches `.env.example` and `.env.template` intentionally — these files sometimes contain real values.
 

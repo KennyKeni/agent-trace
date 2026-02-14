@@ -45,7 +45,15 @@ describe("installCursor", () => {
       readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8"),
     );
     expect(config.hooks.afterAgentResponse).toBeUndefined();
-    expect(config.hooks.beforeShellExecution).toBeUndefined();
+  });
+
+  test("includes beforeShellExecution hook", () => {
+    installCursor(tmpDir, false);
+
+    const config = JSON.parse(
+      readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8"),
+    );
+    expect(config.hooks.beforeShellExecution).toBeDefined();
   });
 
   test("sets version to 1 by default", () => {

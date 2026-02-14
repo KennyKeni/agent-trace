@@ -13,7 +13,8 @@ mock.module("node:child_process", () => ({
   },
 }));
 
-const { detectVcsContext, getWorkspaceRoot } = await import("../trace-store");
+const { detectVcsContext } = await import("../../vcs/detect");
+const { getWorkspaceRoot } = await import("../trace-store");
 
 beforeEach(() => {
   execResponses = new Map();

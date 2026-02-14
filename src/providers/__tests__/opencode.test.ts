@@ -68,7 +68,9 @@ describe("opencode adapt – session lifecycle", () => {
       kind: "session_start",
       provider: "opencode",
       sessionId: "test-session",
+      meta: { session_id: "test-session", source: "opencode" },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 
   test("session.deleted returns session_end with reason", () => {
@@ -76,8 +78,10 @@ describe("opencode adapt – session lifecycle", () => {
     expect(result).toMatchObject({
       kind: "session_end",
       provider: "opencode",
-      meta: { reason: "session.deleted" },
+      sessionId: "test-session",
+      meta: { session_id: "test-session", reason: "session.deleted" },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 
   test("session.idle returns session_end with reason", () => {
@@ -85,8 +89,10 @@ describe("opencode adapt – session lifecycle", () => {
     expect(result).toMatchObject({
       kind: "session_end",
       provider: "opencode",
-      meta: { reason: "session.idle" },
+      sessionId: "test-session",
+      meta: { session_id: "test-session", reason: "session.idle" },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 });
 
@@ -214,35 +220,25 @@ describe("opencode adapt – message.updated", () => {
   });
 });
 
-describe("opencode adapt – command.executed", () => {
-  test("returns shell event with command", () => {
+describe("opencode adapt – command.executed (suppressed)", () => {
+  test("returns undefined — suppressed in favor of hook:tool.execute.after", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "command.executed",
         event: { name: "git status", messageID: "msg-1" },
       }),
     );
-    expect(result).toMatchObject({
-      kind: "shell",
-      provider: "opencode",
-      meta: {
-        event: "command.executed",
-        command: "git status",
-        messageID: "msg-1",
-      },
-    });
+    expect(result).toBeUndefined();
   });
 
-  test("tries alternative key names for command", () => {
+  test("returns undefined even with alternative key names", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "command.executed",
         event: { command: "npm test" },
       }),
     );
-    expect(result).toMatchObject({
-      meta: { command: "npm test" },
-    });
+    expect(result).toBeUndefined();
   });
 
   test("returns undefined when no event", () => {
@@ -263,9 +259,12 @@ describe("opencode adapt – file.edited (generic, unchanged)", () => {
     );
     expect(result).toMatchObject({
       kind: "file_edit",
+      sessionId: "test-session",
       diffs: false,
       edits: [],
       filePath: "src/index.ts",
+      eventName: "file.edited",
+      meta: { session_id: "test-session", source: "opencode" },
     });
   });
 });
@@ -368,12 +367,16 @@ describe("opencode adapt – hook:tool.execute.after", () => {
     expect(result).toMatchObject({
       kind: "shell",
       provider: "opencode",
+      sessionId: "test-session",
       meta: {
+        event: "hook:tool.execute.after",
+        session_id: "test-session",
         tool_name: "bash",
         command: "ls -la",
         source: "opencode.hook",
       },
     });
+    expect(result).not.toHaveProperty("eventName");
   });
 
   test("shell tool returns shell event", () => {
@@ -439,9 +442,94 @@ describe("opencode adapt – hook:tool.execute.after", () => {
   });
 });
 
+describe("opencode adapt – hook:tool.execute.before", () => {
+  test("returns undefined for tool.execute.before", () => {
+    const result = adapt(
+      makeInput({
+        hook_event_name: "hook:tool.execute.before",
+        tool_name: "bash",
+        session_id: "oc-1",
+      }),
+    );
+    expect(result).toBeUndefined();
+  });
+});
+
 describe("opencode adapt – unknown event", () => {
   test("returns undefined", () => {
     const result = adapt(makeInput({ hook_event_name: "some.unknown.event" }));
     expect(result).toBeUndefined();
+  });
+});
+
+describe("opencode adapt – session continuity", () => {
+  const eventInputs = [
+    makeInput({ hook_event_name: "session.created", session_id: "cont-1" }),
+    makeInput({
+      hook_event_name: "file.edited",
+      session_id: "cont-1",
+      event: { file: "src/index.ts" },
+    }),
+    makeInput({
+      hook_event_name: "hook:tool.execute.after",
+      session_id: "cont-1",
+      tool_name: "bash",
+      command: "ls",
+    }),
+    makeInput({
+      hook_event_name: "hook:chat.message",
+      session_id: "cont-1",
+      content: "hello",
+    }),
+    makeInput({ hook_event_name: "session.idle", session_id: "cont-1" }),
+  ];
+
+  test("same sessionId across all event types", () => {
+    for (const input of eventInputs) {
+      const result = adapt(input);
+      if (!result) continue;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        expect(ev.sessionId).toBe("cont-1");
+      }
+    }
+  });
+
+  test("event.sessionID fallback is consistent", () => {
+    const inputs = eventInputs.map((i) => ({
+      ...i,
+      session_id: undefined,
+      event: {
+        ...(typeof i.event === "object" && i.event ? i.event : {}),
+        sessionID: "evt-1",
+      },
+    }));
+    for (const input of inputs) {
+      const result = adapt(input as any);
+      if (!result) continue;
+      const events = Array.isArray(result) ? result : [result];
+      for (const ev of events) {
+        expect(ev.sessionId).toBe("evt-1");
+      }
+    }
+  });
+
+  test("multi-file array shares sessionId", () => {
+    const result = adapt(
+      makeInput({
+        hook_event_name: "hook:tool.execute.after",
+        session_id: "multi-1",
+        tool_name: "edit",
+        files: [
+          { file: "a.ts", before: "a", after: "b" },
+          { file: "b.ts", before: "c", after: "d" },
+          { file: "c.ts", before: "e", after: "f" },
+        ],
+      }),
+    );
+    expect(Array.isArray(result)).toBe(true);
+    for (const ev of result as any[]) {
+      expect(ev.sessionId).toBe("multi-1");
+    }
   });
 });

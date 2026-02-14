@@ -1,7 +1,6 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { structuredPatch } from "diff";
-import { registerExtension } from "../core/trace-hook";
 import { getWorkspaceRoot } from "../core/trace-store";
 import { normalizeNewlines } from "../core/utils";
 import { ensureParent, nowIso, sanitizeSessionId } from "./helpers";
@@ -67,11 +66,22 @@ export function appendDiffArtifact(
   return `file://${path}`;
 }
 
-registerExtension({
+export const diffsExtension = {
   name: "diffs",
-  onTraceEvent(event) {
+  onTraceEvent(event: import("../core/types").TraceEvent) {
     if (event.kind !== "file_edit") return;
     if (event.diffs === false) return;
+
+    if (event.precomputedPatch) {
+      appendDiffArtifact(
+        event.provider,
+        event.sessionId,
+        event.filePath,
+        event.eventName,
+        event.precomputedPatch,
+      );
+      return;
+    }
 
     for (const edit of event.edits) {
       const diff = createPatchFromStrings(
@@ -90,4 +100,4 @@ registerExtension({
       }
     }
   },
-});
+};

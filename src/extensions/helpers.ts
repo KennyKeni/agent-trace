@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { ensureParent } from "../core/utils";
 
-export { ensureDir, ensureParent } from "../core/utils";
+export { ensureParent } from "../core/utils";
 
 export function appendJsonl(path: string, value: unknown): void {
   ensureParent(path);

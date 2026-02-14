@@ -3,10 +3,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { runHook } from "./core/trace-hook";
-import "./extensions";
-import "./providers";
+import { processHookInput } from "./core/pipeline";
+import { registeredProviderNames } from "./core/registry";
 import { getWorkspaceRoot } from "./core/trace-store";
+import type { HookInput } from "./core/types";
+import { registerBuiltinExtensions } from "./extensions";
 import {
   InstallError,
   install,
@@ -14,6 +15,55 @@ import {
   printInstallSummary,
 } from "./install";
 import { getPackageVersion } from "./install/utils";
+import { registerBuiltinProviders } from "./providers";
+
+registerBuiltinProviders();
+registerBuiltinExtensions();
+
+function parseProvider(argv: string[]): string | undefined {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--provider") {
+      return argv[i + 1] ?? undefined;
+    }
+    if (arg?.startsWith("--provider=")) {
+      return arg.slice("--provider=".length) || undefined;
+    }
+  }
+  return undefined;
+}
+
+async function runHook() {
+  const registered = registeredProviderNames();
+  if (registered.length === 0) {
+    console.error("No providers registered.");
+    process.exit(1);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of Bun.stdin.stream()) {
+    chunks.push(Buffer.from(chunk));
+  }
+
+  const json = Buffer.concat(chunks).toString("utf-8").trim();
+  if (!json) process.exit(0);
+
+  try {
+    const providerName = parseProvider(process.argv.slice(2));
+    if (!providerName) {
+      console.error(
+        `Missing --provider flag. Registered providers: ${registered.join(", ")}`,
+      );
+      process.exit(1);
+    }
+
+    const input = JSON.parse(json) as HookInput;
+    await processHookInput(providerName, input);
+  } catch (e) {
+    console.error("Hook error:", e);
+    process.exit(1);
+  }
+}
 
 function printHelp(): void {
   console.log(`agent-trace - AI code attribution tracker
@@ -24,7 +74,7 @@ Usage:
 Commands:
   init       Initialize hooks for Cursor, Claude Code, OpenCode, and Codex
   hook       Run the trace hook (reads JSON from stdin)
-  codex      Codex subcommands (notify, ingest, exec)
+  codex      Codex subcommands (notify, ingest)
   status     Show installed hook status
   help       Show this help message
 
@@ -37,7 +87,6 @@ Init options:
 Codex subcommands:
   codex notify '<json>'   Handle Codex notify callback
   codex ingest            Read Codex JSONL from stdin
-  codex exec [args...]    Wrap codex exec --json with tracing
 
 Examples:
   agent-trace init
