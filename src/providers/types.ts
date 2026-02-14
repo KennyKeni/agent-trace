@@ -1,4 +1,4 @@
-export const PROVIDERS = ["cursor", "claude", "opencode", "codex"] as const;
+export const PROVIDERS = ["cursor", "claude", "opencode"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 export function isProvider(value: string): value is Provider {

@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { HookInput } from "./core/types";
 
@@ -65,15 +64,14 @@ Usage:
   agent-trace <command> [options]
 
 Commands:
-  init        Initialize hooks for Cursor, Claude Code, OpenCode, and Codex
+  init        Initialize hooks for Cursor, Claude Code, and OpenCode
   uninstall   Remove agent-trace hooks from providers
   hook        Run the trace hook (reads JSON from stdin)
-  codex       Codex subcommands (notify, ingest)
   status      Show installed hook status
   help        Show this help message
 
 Init options:
-  --providers <list>   Comma-separated providers (cursor,claude,opencode,codex) [default: all]
+  --providers <list>   Comma-separated providers (cursor,claude,opencode) [default: all]
   --target-root <dir>  Target project root [default: current directory]
   --dry-run            Preview changes without writing
   --latest             Use latest version instead of pinning to current
@@ -83,10 +81,6 @@ Uninstall options:
   --target-root <dir>  Target project root [default: current directory]
   --dry-run            Preview changes without removing
   --purge              Also delete .agent-trace/ directory (traces + config)
-
-Codex subcommands:
-  codex notify '<json>'   Handle Codex notify callback
-  codex ingest            Read Codex JSONL from stdin
 
 Examples:
   agent-trace init
@@ -108,12 +102,6 @@ function checkHookConfig(
   } catch {
     return "not installed";
   }
-}
-
-function codexConfigStatus(): "installed" | "not installed" {
-  const home = process.env.CODEX_HOME ?? join(homedir(), ".codex");
-  const configPath = join(home, "config.toml");
-  return checkHookConfig(configPath, "agent-trace");
 }
 
 async function status() {
@@ -152,7 +140,6 @@ async function status() {
     "agent-trace hook --provider claude",
   );
   const opencodeStatus = checkHookConfig(opencodePath, "agent-trace");
-  const codexStatus = codexConfigStatus();
   const traceDir = join(root, ".agent-trace");
   const hasTraces = existsSync(join(traceDir, "traces.jsonl"));
 
@@ -161,7 +148,6 @@ async function status() {
   console.log(`Cursor:     ${cursorStatus}`);
   console.log(`Claude:     ${claudeStatus}`);
   console.log(`OpenCode:   ${opencodeStatus}`);
-  console.log(`Codex:      ${codexStatus} (global, always latest)`);
   console.log(`Traces:     ${hasTraces ? "present" : "none"}`);
 }
 
@@ -223,12 +209,6 @@ switch (command) {
   case "hook":
     await runHook();
     break;
-  case "codex": {
-    const { runCodexSubcommand } = await import("./codex");
-    const exitCode = await runCodexSubcommand(process.argv.slice(3));
-    process.exit(exitCode);
-    break;
-  }
   case "status":
     await status();
     break;

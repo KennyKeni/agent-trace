@@ -3,7 +3,6 @@ import { parseArgs as nodeParseArgs } from "node:util";
 import { getWorkspaceRoot } from "../core/trace-store";
 import { isProvider, PROVIDERS, type Provider } from "../providers/types";
 import { uninstallClaude } from "./claude";
-import { uninstallCodex } from "./codex";
 import { uninstallConfig } from "./config";
 import { uninstallCursor } from "./cursor";
 import { uninstallOpenCode } from "./opencode";
@@ -82,10 +81,6 @@ export function parseUninstallArgs(argv: string[]): UninstallOptions {
 
 export function uninstall(options: UninstallOptions): ChangeSummary[] {
   const changes: ChangeSummary[] = [];
-
-  if (options.providers.includes("codex")) {
-    changes.push(uninstallCodex(options.dryRun));
-  }
 
   for (const targetRoot of options.targetRoots) {
     if (options.providers.includes("cursor")) {

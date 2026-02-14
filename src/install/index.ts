@@ -1,5 +1,4 @@
 import { installClaude } from "./claude";
-import { installCodex } from "./codex";
 import { installConfig } from "./config";
 import { installCursor } from "./cursor";
 import { installOpenCode } from "./opencode";
@@ -10,10 +9,6 @@ export type { ChangeSummary, InstallOptions } from "./types";
 
 export function install(options: InstallOptions): ChangeSummary[] {
   const changes: ChangeSummary[] = [];
-
-  if (options.providers.includes("codex")) {
-    changes.push(installCodex(options.dryRun));
-  }
 
   for (const targetRoot of options.targetRoots) {
     changes.push(

@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
 import color from "picocolors";
@@ -15,7 +14,6 @@ const PROVIDER_LABELS: Record<Provider, string> = {
   cursor: "Cursor",
   claude: "Claude Code",
   opencode: "OpenCode",
-  codex: "Codex",
 };
 
 const EXTENSION_OPTIONS = [
@@ -47,8 +45,6 @@ function formatProviderStatus(installed: Provider[]): string {
     const label = PROVIDER_LABELS[provider];
     if (!installed.includes(provider))
       return `   ${label} ${color.dim("not installed")}`;
-    if (provider === "codex")
-      return `   ${label} ${color.green("✓")} ${color.dim("(global, always latest)")}`;
     return `   ${label} ${color.green("✓")}`;
   }).join("\n");
 }
@@ -207,10 +203,7 @@ async function existingConfigFlow(
   // Upgrade: rewrite hooks for installed providers, update config version
   const confirm = await p.confirm({
     message: `Upgrade ${color.bold(
-      installed
-        .filter((p) => p !== "codex")
-        .map((p) => PROVIDER_LABELS[p])
-        .join(", "),
+      installed.map((p) => PROVIDER_LABELS[p]).join(", "),
     )} to ${color.bold(`v${cliVersion}`)}?`,
   });
 
@@ -272,11 +265,6 @@ function detectInstalledProviders(targetRoot: string): Provider[] {
   }
   if (existsSync(join(targetRoot, ".opencode", "plugins", "agent-trace.ts"))) {
     installed.push("opencode");
-  }
-
-  const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
-  if (fileContains(join(codexHome, "config.toml"), pkg)) {
-    installed.push("codex");
   }
 
   return installed;
