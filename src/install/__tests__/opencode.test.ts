@@ -77,7 +77,7 @@ describe("installOpenCode replaces placeholder", () => {
   test("output does not contain __AGENT_TRACE_PKG__", async () => {
     const { installOpenCode } = await import("../opencode");
     const tmp = join(import.meta.dir, "..", "..", "..", ".tmp-test-opencode");
-    const result = installOpenCode(tmp, true);
+    const result = installOpenCode(tmp, true, "1.0.0");
     expect(result.status).toBeDefined();
     // When not dry-run, the file would have the placeholder replaced.
     // We verify the function itself works without error in dry-run mode.

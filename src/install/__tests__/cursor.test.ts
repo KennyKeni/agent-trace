@@ -23,7 +23,7 @@ afterEach(() => {
 
 describe("installCursor", () => {
   test("creates hooks.json with correct events", () => {
-    const result = installCursor(tmpDir, false);
+    const result = installCursor(tmpDir, false, "1.0.0");
     expect(result.status).toBe("created");
 
     const config = JSON.parse(
@@ -39,7 +39,7 @@ describe("installCursor", () => {
   });
 
   test("does not include removed hooks", () => {
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8"),
@@ -48,7 +48,7 @@ describe("installCursor", () => {
   });
 
   test("includes beforeShellExecution hook", () => {
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8"),
@@ -57,7 +57,7 @@ describe("installCursor", () => {
   });
 
   test("sets version to 1 by default", () => {
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8"),
@@ -74,7 +74,7 @@ describe("installCursor", () => {
       "utf-8",
     );
 
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(readFileSync(hooksPath, "utf-8"));
     expect(config.version).toBe(3);
@@ -89,7 +89,7 @@ describe("installCursor", () => {
       "utf-8",
     );
 
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(readFileSync(hooksPath, "utf-8"));
     expect(config.customKey).toBe("data");
@@ -97,10 +97,10 @@ describe("installCursor", () => {
   });
 
   test("idempotent — second run reports unchanged", () => {
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
     const first = readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8");
 
-    const result = installCursor(tmpDir, false);
+    const result = installCursor(tmpDir, false, "1.0.0");
     expect(result.status).toBe("unchanged");
 
     const second = readFileSync(join(tmpDir, ".cursor", "hooks.json"), "utf-8");
@@ -108,13 +108,13 @@ describe("installCursor", () => {
   });
 
   test("dry run does not create file", () => {
-    const result = installCursor(tmpDir, true);
+    const result = installCursor(tmpDir, true, "1.0.0");
     expect(result.status).toBe("created");
     expect(existsSync(join(tmpDir, ".cursor", "hooks.json"))).toBe(false);
   });
 
   test("hooks contain agent-trace command", () => {
-    installCursor(tmpDir, false);
+    installCursor(tmpDir, false, "1.0.0");
 
     const content = readFileSync(
       join(tmpDir, ".cursor", "hooks.json"),

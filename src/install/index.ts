@@ -4,7 +4,6 @@ import { installConfig } from "./config";
 import { installCursor } from "./cursor";
 import { installOpenCode } from "./opencode";
 import type { ChangeSummary, InstallOptions } from "./types";
-import { installIgnoreEntry } from "./vcs-ignore";
 
 export { InstallError, parseArgs } from "./args";
 export type { ChangeSummary, InstallOptions } from "./types";
@@ -13,26 +12,28 @@ export function install(options: InstallOptions): ChangeSummary[] {
   const changes: ChangeSummary[] = [];
 
   if (options.providers.includes("codex")) {
-    changes.push(installCodex(options.dryRun, options.pinVersion));
+    changes.push(installCodex(options.dryRun));
   }
 
   for (const targetRoot of options.targetRoots) {
-    changes.push(installIgnoreEntry(targetRoot, options.dryRun));
-    changes.push(installConfig(targetRoot, options.dryRun));
+    changes.push(
+      installConfig(
+        targetRoot,
+        options.dryRun,
+        options.version,
+        options.extensions,
+      ),
+    );
 
     if (options.providers.includes("cursor")) {
-      changes.push(
-        installCursor(targetRoot, options.dryRun, options.pinVersion),
-      );
+      changes.push(installCursor(targetRoot, options.dryRun, options.version));
     }
     if (options.providers.includes("claude")) {
-      changes.push(
-        installClaude(targetRoot, options.dryRun, options.pinVersion),
-      );
+      changes.push(installClaude(targetRoot, options.dryRun, options.version));
     }
     if (options.providers.includes("opencode")) {
       changes.push(
-        installOpenCode(targetRoot, options.dryRun, options.pinVersion),
+        installOpenCode(targetRoot, options.dryRun, options.version),
       );
     }
   }

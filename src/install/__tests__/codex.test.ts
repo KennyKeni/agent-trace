@@ -81,8 +81,8 @@ describe("installCodex", () => {
     expect(existsSync(join(CODEX_HOME, "config.toml"))).toBe(false);
   });
 
-  it("uses unpinned version when pinVersion is false", () => {
-    const result = installCodex(false, false);
+  it("always uses unpinned version", () => {
+    const result = installCodex(false);
     expect(result.status).toBe("created");
 
     const content = readFileSync(result.file, "utf-8");

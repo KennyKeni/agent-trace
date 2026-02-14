@@ -65,17 +65,24 @@ Usage:
   agent-trace <command> [options]
 
 Commands:
-  init       Initialize hooks for Cursor, Claude Code, OpenCode, and Codex
-  hook       Run the trace hook (reads JSON from stdin)
-  codex      Codex subcommands (notify, ingest)
-  status     Show installed hook status
-  help       Show this help message
+  init        Initialize hooks for Cursor, Claude Code, OpenCode, and Codex
+  uninstall   Remove agent-trace hooks from providers
+  hook        Run the trace hook (reads JSON from stdin)
+  codex       Codex subcommands (notify, ingest)
+  status      Show installed hook status
+  help        Show this help message
 
 Init options:
   --providers <list>   Comma-separated providers (cursor,claude,opencode,codex) [default: all]
   --target-root <dir>  Target project root [default: current directory]
   --dry-run            Preview changes without writing
   --latest             Use latest version instead of pinning to current
+
+Uninstall options:
+  --providers <list>   Comma-separated providers to remove [default: all]
+  --target-root <dir>  Target project root [default: current directory]
+  --dry-run            Preview changes without removing
+  --purge              Also delete .agent-trace/ directory (traces + config)
 
 Codex subcommands:
   codex notify '<json>'   Handle Codex notify callback
@@ -84,8 +91,9 @@ Codex subcommands:
 Examples:
   agent-trace init
   agent-trace init --providers cursor
-  agent-trace init --providers codex
-  agent-trace init --target-root ~/my-project
+  agent-trace uninstall
+  agent-trace uninstall --providers cursor --dry-run
+  agent-trace uninstall --purge
   agent-trace status`);
 }
 
@@ -110,8 +118,26 @@ function codexConfigStatus(): "installed" | "not installed" {
 
 async function status() {
   const { getWorkspaceRoot } = await import("./core/trace-store");
+  const { readConfig } = await import("./install/config");
+  const { getPackageVersion } = await import("./install/utils");
 
   const root = getWorkspaceRoot();
+  const cliVersion = getPackageVersion();
+
+  const config = readConfig(root);
+  const configVersion =
+    config && typeof config.version === "string" ? config.version : null;
+
+  let versionLine: string;
+  if (!configVersion) {
+    versionLine = "not configured";
+  } else if (configVersion === "latest") {
+    versionLine = "latest (unpinned)";
+  } else if (configVersion === cliVersion) {
+    versionLine = `v${configVersion} (up to date)`;
+  } else {
+    versionLine = `v${configVersion} (outdated — current: v${cliVersion})`;
+  }
 
   const cursorPath = join(root, ".cursor", "hooks.json");
   const claudePath = join(root, ".claude", "settings.json");
@@ -130,11 +156,12 @@ async function status() {
   const traceDir = join(root, ".agent-trace");
   const hasTraces = existsSync(join(traceDir, "traces.jsonl"));
 
-  console.log(`Workspace: ${root}\n`);
+  console.log(`Workspace:  ${root}`);
+  console.log(`Version:    ${versionLine}\n`);
   console.log(`Cursor:     ${cursorStatus}`);
   console.log(`Claude:     ${claudeStatus}`);
   console.log(`OpenCode:   ${opencodeStatus}`);
-  console.log(`Codex:      ${codexStatus}`);
+  console.log(`Codex:      ${codexStatus} (global, always latest)`);
   console.log(`Traces:     ${hasTraces ? "present" : "none"}`);
 }
 
@@ -142,26 +169,54 @@ const command = process.argv[2];
 
 switch (command) {
   case "init": {
-    const { registerBuiltinProviders } = await import("./providers");
-    const {
-      InstallError,
-      install,
-      parseArgs,
-      printInstallSummary,
-    } = await import("./install");
+    const initArgs = process.argv.slice(3);
+    if (initArgs.length === 0) {
+      const { interactiveInit } = await import("./install/interactive");
+      await interactiveInit();
+    } else {
+      const { registerBuiltinProviders } = await import("./providers");
+      const { InstallError, install, parseArgs, printInstallSummary } =
+        await import("./install");
 
-    registerBuiltinProviders();
+      registerBuiltinProviders();
 
-    try {
-      const options = parseArgs(process.argv.slice(3));
-      const changes = install(options);
-      printInstallSummary(changes, options.targetRoots);
-    } catch (e) {
-      if (e instanceof InstallError) {
-        console.error(e.message);
-        process.exit(1);
+      try {
+        const options = parseArgs(initArgs);
+        const changes = install(options);
+        printInstallSummary(changes, options.targetRoots);
+      } catch (e) {
+        if (e instanceof InstallError) {
+          console.error(e.message);
+          process.exit(1);
+        }
+        throw e;
       }
-      throw e;
+    }
+    break;
+  }
+  case "uninstall": {
+    const uninstallArgs = process.argv.slice(3);
+    if (uninstallArgs.length === 0) {
+      const { interactiveUninstall } = await import("./install/interactive");
+      await interactiveUninstall();
+    } else {
+      const {
+        UninstallError,
+        uninstall,
+        parseUninstallArgs,
+        printUninstallSummary,
+      } = await import("./install/uninstall");
+      try {
+        const options = parseUninstallArgs(uninstallArgs);
+        const changes = uninstall(options);
+        printUninstallSummary(changes);
+      } catch (e) {
+        if (e instanceof UninstallError) {
+          console.error(e.message);
+          process.exit(1);
+        }
+        throw e;
+      }
     }
     break;
   }

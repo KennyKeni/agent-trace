@@ -30,6 +30,17 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bunx @kennykeni/agent-trace hook --provider claude"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
@@ -53,17 +64,6 @@
     "PostToolUseFailure": [
       {
         "matcher": "Write|Edit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bunx @kennykeni/agent-trace hook --provider claude"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",

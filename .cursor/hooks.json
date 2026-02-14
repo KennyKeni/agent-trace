@@ -16,6 +16,11 @@
         "command": "bunx @kennykeni/agent-trace hook --provider cursor"
       }
     ],
+    "beforeShellExecution": [
+      {
+        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
+      }
+    ],
     "afterFileEdit": [
       {
         "command": "bunx @kennykeni/agent-trace hook --provider cursor"
@@ -27,11 +32,6 @@
       }
     ],
     "afterShellExecution": [
-      {
-        "command": "bunx @kennykeni/agent-trace hook --provider cursor"
-      }
-    ],
-    "beforeShellExecution": [
       {
         "command": "bunx @kennykeni/agent-trace hook --provider cursor"
       }

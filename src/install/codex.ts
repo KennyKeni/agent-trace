@@ -2,32 +2,29 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ChangeSummary } from "./types";
-import { getPackageName, getPackageVersion, writeTextFile } from "./utils";
+import { getPackageName, writeTextFile } from "./utils";
 
 function codexConfigPath(): string {
   const home = process.env.CODEX_HOME ?? join(homedir(), ".codex");
   return join(home, "config.toml");
 }
 
-function buildNotifyValue(pinVersion: boolean): string {
+function buildNotifyValue(): string {
   const pkg = getPackageName();
-  const target = pinVersion ? `${pkg}@${getPackageVersion()}` : pkg;
-  return `notify = ["bunx", "-y", "${target}", "codex", "notify"]`;
+  return `notify = ["bunx", "-y", "${pkg}", "codex", "notify"]`;
 }
 
-export function installCodex(
-  dryRun: boolean,
-  pinVersion = true,
-): ChangeSummary {
+export function installCodex(dryRun: boolean): ChangeSummary {
   const configPath = codexConfigPath();
-  const notifyLine = buildNotifyValue(pinVersion);
+  const notifyLine = buildNotifyValue();
 
   let content = "";
   if (existsSync(configPath)) {
     content = readFileSync(configPath, "utf-8");
   }
 
-  if (/^notify\s*=.*agent-trace/m.test(content)) {
+  const pkg = getPackageName();
+  if (content.includes(pkg) && /^notify\s*=/m.test(content)) {
     return { file: configPath, status: "unchanged" };
   }
 
@@ -46,6 +43,48 @@ export function installCodex(
       const trimmed = content.trimEnd();
       next = trimmed ? `${trimmed}\n${notifyLine}\n` : `${notifyLine}\n`;
     }
+  }
+
+  return writeTextFile(configPath, next, dryRun);
+}
+
+export function uninstallCodex(dryRun: boolean): ChangeSummary {
+  const configPath = codexConfigPath();
+  if (!existsSync(configPath)) {
+    return { file: configPath, status: "unchanged", note: "not found" };
+  }
+
+  let content: string;
+  try {
+    content = readFileSync(configPath, "utf-8");
+  } catch {
+    return { file: configPath, status: "skipped", note: "could not read" };
+  }
+
+  const pkg = getPackageName();
+  if (!content.includes(pkg)) {
+    return { file: configPath, status: "unchanged" };
+  }
+
+  // Remove single-line notify containing the package
+  const singleLine = /^notify\s*=\s*\[.*\]\s*$/m;
+  // Remove multiline notify containing the package
+  const multiLine = /^notify\s*=\s*\[\s*\n(?:.*\n)*?\s*\]\s*$/m;
+
+  let next = content;
+  for (const pattern of [singleLine, multiLine]) {
+    const match = next.match(pattern);
+    if (match?.[0].includes(pkg) && match.index !== undefined) {
+      next =
+        next.slice(0, match.index) + next.slice(match.index + match[0].length);
+    }
+  }
+
+  // Clean up extra blank lines left behind
+  next = next.replace(/\n{3,}/g, "\n\n");
+
+  if (next === content) {
+    return { file: configPath, status: "unchanged" };
   }
 
   return writeTextFile(configPath, next, dryRun);

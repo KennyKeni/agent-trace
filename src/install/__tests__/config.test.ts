@@ -23,18 +23,14 @@ afterEach(() => {
 
 describe("installConfig", () => {
   test("creates config.json with default values", () => {
-    const result = installConfig(tmpDir, false);
+    const result = installConfig(tmpDir, false, "1.0.0");
     expect(result.status).toBe("created");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".agent-trace", "config.json"), "utf-8"),
     );
-    expect(config.extensions).toEqual([
-      "diffs",
-      "line-hashes",
-      "raw-events",
-      "messages",
-    ]);
+    expect(config.version).toBe("1.0.0");
+    expect(config.extensions).toEqual([]);
     expect(config.useGitignore).toBe(true);
     expect(config.useBuiltinSensitive).toBe(true);
     expect(config.ignore).toEqual([]);
@@ -49,7 +45,7 @@ describe("installConfig", () => {
       JSON.stringify({ extensions: ["diffs"], ignore: ["*.secret"] }),
     );
 
-    const result = installConfig(tmpDir, false);
+    const result = installConfig(tmpDir, false, "1.0.0");
     expect(result.status).toBe("unchanged");
     expect(result.note).toBe("already exists");
 
@@ -61,7 +57,7 @@ describe("installConfig", () => {
   });
 
   test("dry run does not create file", () => {
-    const result = installConfig(tmpDir, true);
+    const result = installConfig(tmpDir, true, "1.0.0");
     expect(result.status).toBe("created");
     expect(existsSync(join(tmpDir, ".agent-trace", "config.json"))).toBe(false);
   });

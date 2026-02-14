@@ -23,7 +23,7 @@ afterEach(() => {
 
 describe("installClaude", () => {
   test("creates settings.json with all hook events", () => {
-    const result = installClaude(tmpDir, false);
+    const result = installClaude(tmpDir, false, "1.0.0");
     expect(result.status).toBe("created");
 
     const config = JSON.parse(
@@ -39,7 +39,7 @@ describe("installClaude", () => {
   });
 
   test("PreToolUse has Bash matcher", () => {
-    installClaude(tmpDir, false);
+    installClaude(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"),
@@ -50,7 +50,7 @@ describe("installClaude", () => {
   });
 
   test("PostToolUse has Write|Edit and Bash matchers", () => {
-    installClaude(tmpDir, false);
+    installClaude(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"),
@@ -62,7 +62,7 @@ describe("installClaude", () => {
   });
 
   test("PostToolUseFailure has Write|Edit|Bash matcher", () => {
-    installClaude(tmpDir, false);
+    installClaude(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(
       readFileSync(join(tmpDir, ".claude", "settings.json"), "utf-8"),
@@ -74,7 +74,7 @@ describe("installClaude", () => {
   });
 
   test("hook entries use command type with agent-trace", () => {
-    installClaude(tmpDir, false);
+    installClaude(tmpDir, false, "1.0.0");
 
     const content = readFileSync(
       join(tmpDir, ".claude", "settings.json"),
@@ -86,13 +86,13 @@ describe("installClaude", () => {
   });
 
   test("idempotent — second run reports unchanged", () => {
-    installClaude(tmpDir, false);
+    installClaude(tmpDir, false, "1.0.0");
     const first = readFileSync(
       join(tmpDir, ".claude", "settings.json"),
       "utf-8",
     );
 
-    const result = installClaude(tmpDir, false);
+    const result = installClaude(tmpDir, false, "1.0.0");
     expect(result.status).toBe("unchanged");
 
     const second = readFileSync(
@@ -111,14 +111,14 @@ describe("installClaude", () => {
       "utf-8",
     );
 
-    installClaude(tmpDir, false);
+    installClaude(tmpDir, false, "1.0.0");
 
     const config = JSON.parse(readFileSync(settingsPath, "utf-8"));
     expect(config.customKey).toBe("value");
   });
 
   test("dry run does not create file", () => {
-    const result = installClaude(tmpDir, true);
+    const result = installClaude(tmpDir, true, "1.0.0");
     expect(result.status).toBe("created");
     expect(existsSync(join(tmpDir, ".claude", "settings.json"))).toBe(false);
   });

@@ -67,12 +67,8 @@ export function getPackageVersion(): string {
   return readPkg().version;
 }
 
-export function hookCommand(
-  provider: string,
-  options?: { pinVersion?: boolean },
-): string {
+export function hookCommand(provider: string, version: string): string {
   const pkg = getPackageName();
-  const pinVersion = options?.pinVersion ?? true;
-  const target = pinVersion ? `${pkg}@${getPackageVersion()}` : pkg;
+  const target = version === "latest" ? pkg : `${pkg}@${version}`;
   return `bunx ${target} hook --provider ${provider}`;
 }

@@ -3,6 +3,7 @@ import { parseArgs as nodeParseArgs } from "node:util";
 import { getWorkspaceRoot } from "../core/trace-store";
 import { isProvider, PROVIDERS, type Provider } from "../providers/types";
 import type { InstallOptions } from "./types";
+import { getPackageVersion } from "./utils";
 
 export class InstallError extends Error {
   constructor(message: string) {
@@ -58,7 +59,7 @@ export function parseArgs(argv: string[]): InstallOptions {
 
   const providers = parseProviders(values.providers);
   const dryRun = values["dry-run"] ?? false;
-  const pinVersion = !(values.latest ?? false);
+  const version = values.latest ? "latest" : getPackageVersion();
 
   const targetRoots = values["target-root"]?.map(normalizePath) ?? [];
   if (targetRoots.length === 0) {
@@ -67,5 +68,5 @@ export function parseArgs(argv: string[]): InstallOptions {
 
   const dedupedTargets = [...new Set(targetRoots.map(normalizePath))];
 
-  return { providers, dryRun, pinVersion, targetRoots: dedupedTargets };
+  return { providers, dryRun, version, targetRoots: dedupedTargets };
 }
