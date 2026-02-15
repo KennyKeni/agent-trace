@@ -98,7 +98,7 @@ Additional artifacts are written by extensions under `.agent-trace/`:
 
 ```json
 {
-  "version": "0.0.1",
+  "version": "0.10.0",
   "extensions": [],
   "useGitignore": true,
   "useBuiltinSensitive": true,
