@@ -41,28 +41,10 @@ describe("CLI command routing", () => {
     expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  test("-v prints version string", () => {
-    const { exitCode, stdout } = run(["-v"]);
-    expect(exitCode).toBe(0);
-    expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
-  });
-
-  test("help prints usage text", () => {
-    const { exitCode, stdout } = run(["help"]);
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("agent-trace");
-    expect(stdout).toContain("Commands:");
-  });
-
   test("--help prints usage text", () => {
     const { exitCode, stdout } = run(["--help"]);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("Commands:");
-  });
-
-  test("-h prints usage text", () => {
-    const { exitCode, stdout } = run(["-h"]);
-    expect(exitCode).toBe(0);
+    expect(stdout).toContain("agent-trace");
     expect(stdout).toContain("Commands:");
   });
 

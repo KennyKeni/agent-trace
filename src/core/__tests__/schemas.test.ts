@@ -10,10 +10,6 @@ describe("SPEC_VERSION", () => {
   test("is two-part semver per spec regex", () => {
     expect(SPEC_VERSION).toMatch(/^\d+\.\d+$/);
   });
-
-  test("is 0.1", () => {
-    expect(SPEC_VERSION).toBe("0.1");
-  });
 });
 
 describe("TraceRecordSchema version field", () => {

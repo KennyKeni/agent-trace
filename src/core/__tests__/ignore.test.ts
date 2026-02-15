@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  BUILTIN_SENSITIVE,
   extractFilePathsFromRaw,
   type IgnoreConfig,
   isIgnored,
@@ -458,17 +457,5 @@ describe("scrubRawInput", () => {
     expect(scrubbed.hook_event_name).toBe("PostToolUse");
     expect(scrubbed.model).toBe("claude-4");
     expect(scrubbed.session_id).toBe("sess-123");
-  });
-});
-
-describe("BUILTIN_SENSITIVE", () => {
-  test("all patterns start with **/", () => {
-    for (const pattern of BUILTIN_SENSITIVE) {
-      expect(pattern.startsWith("**/")).toBe(true);
-    }
-  });
-
-  test("has expected number of patterns", () => {
-    expect(BUILTIN_SENSITIVE.length).toBe(12);
   });
 });

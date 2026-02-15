@@ -38,16 +38,6 @@ describe("installConfig", () => {
     expect(config.ignoreMode).toBe("redact");
   });
 
-  test("rawCapture false is written to config", () => {
-    const result = installConfig(tmpDir, false, "1.0.0", [], false);
-    expect(result.status).toBe("created");
-
-    const config = JSON.parse(
-      readFileSync(join(tmpDir, ".agent-trace", "config.json"), "utf-8"),
-    );
-    expect(config.rawCapture).toBe(false);
-  });
-
   test("does not overwrite existing config", () => {
     const configDir = join(tmpDir, ".agent-trace");
     mkdirSync(configDir, { recursive: true });

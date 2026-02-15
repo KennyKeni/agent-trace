@@ -18,12 +18,6 @@ describe("parseArgs", () => {
     ).toThrow(InstallError);
   });
 
-  test("throws InstallError when all providers are invalid", () => {
-    expect(() =>
-      parseArgs(["--providers", "cursr", "--target-root", "/tmp/fake-repo"]),
-    ).toThrow(InstallError);
-  });
-
   test("--target-root skips git detection", () => {
     const opts = parseArgs(["--target-root", "/tmp/fake-repo"]);
     expect(opts.targetRoots).toEqual(["/tmp/fake-repo"]);

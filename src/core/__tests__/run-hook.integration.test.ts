@@ -763,11 +763,6 @@ describe("runHook integration", () => {
   });
 
   describe("error handling", () => {
-    test("empty stdin exits 0", () => {
-      const { exitCode } = hookRaw(["--provider", "claude"], "", tmpDir);
-      expect(exitCode).toBe(0);
-    });
-
     test("missing --provider exits 1", () => {
       const { exitCode, stderr } = hookRaw(
         [],

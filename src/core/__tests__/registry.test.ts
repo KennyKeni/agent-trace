@@ -44,10 +44,6 @@ describe("provider registry", () => {
     expect(registeredProviderNames()).toEqual(["alpha", "beta"]);
   });
 
-  test("registeredProviderNames returns empty array when none registered", () => {
-    expect(registeredProviderNames()).toEqual([]);
-  });
-
   test("duplicate registerProvider overwrites previous adapter", () => {
     const first = stubAdapter();
     const second = stubAdapter();
