@@ -1,3 +1,6 @@
+import { appendFileSync, readFileSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
+import { traceWriterExtension } from "../extensions/trace-writer";
 import { dispatchTraceEvent } from "./dispatch";
 import {
   extractFilePathsFromRaw,
@@ -7,6 +10,7 @@ import {
   loadConfig,
   scrubRawInput,
 } from "./ignore";
+import { writeRawEvent } from "./raw-capture";
 import {
   activeExtensions,
   getProvider,
@@ -18,7 +22,34 @@ import {
   type SnapshotContext,
 } from "./snapshot-middleware";
 import { getWorkspaceRoot } from "./trace-store";
-import type { HookInput } from "./types";
+import type { ExtensionContext, HookInput } from "./types";
+import { ensureParent } from "./utils";
+
+function buildExtensionContext(
+  root: string,
+  toolInfo?: { name: string; version?: string },
+): ExtensionContext {
+  return {
+    root,
+    toolInfo,
+    appendJsonl(path: string, value: unknown) {
+      ensureParent(path);
+      appendFileSync(path, `${JSON.stringify(value)}\n`, "utf-8");
+    },
+    appendText(path: string, text: string) {
+      ensureParent(path);
+      appendFileSync(path, text, "utf-8");
+    },
+    tryReadFile(path: string) {
+      try {
+        const resolved = isAbsolute(path) ? path : resolve(root, path);
+        return readFileSync(resolved, "utf-8");
+      } catch {
+        return undefined;
+      }
+    },
+  };
+}
 
 function filterDeletedPaths(
   paths: string[],
@@ -81,32 +112,34 @@ export async function processHookInput(
     }
     const config = loadConfig(root);
     const sessionId = adapter.sessionIdFor(input);
-    const extensions = activeExtensions(config.extensions);
+    const userExtensions = activeExtensions(config.extensions);
+    const extensions = [traceWriterExtension, ...userExtensions];
     const { ignore: ignoreConfig } = config;
 
-    const rawFiltered = shouldFilterRawInput(
-      providerName,
-      input,
-      root,
-      ignoreConfig,
+    const ctx = buildExtensionContext(root, adapter.toolInfo?.());
+    const capabilities = new Set(
+      extensions.flatMap((e) => e.capabilities ?? []),
     );
 
-    for (const ext of extensions) {
-      if (ext.onRawInput) {
-        try {
-          if (rawFiltered) {
-            if (ignoreConfig.mode === "skip") continue;
-            ext.onRawInput(providerName, sessionId, scrubRawInput(input));
-          } else {
-            ext.onRawInput(providerName, sessionId, input);
+    if (config.rawCapture) {
+      try {
+        const rawFiltered = shouldFilterRawInput(
+          providerName,
+          input,
+          root,
+          ignoreConfig,
+        );
+        if (rawFiltered) {
+          if (ignoreConfig.mode !== "skip") {
+            writeRawEvent(providerName, sessionId, scrubRawInput(input), ctx);
           }
-        } catch (e) {
-          console.error(`Extension error (${ext.name}/onRawInput):`, e);
+        } else {
+          writeRawEvent(providerName, sessionId, input, ctx);
         }
+      } catch (e) {
+        console.error("[agent-trace] Raw capture failed:", e);
       }
     }
-
-    const toolInfo = adapter.toolInfo?.();
 
     const result = adapter.adapt(input);
     const adapterEvents = result
@@ -120,7 +153,7 @@ export async function processHookInput(
       input,
       repoRoot: root,
       adapterEvents,
-      activeExtensionNames: extensions.map((e) => e.name),
+      capabilities,
       sessionIdFor: (i) => adapter.sessionIdFor(i),
       shellSnapshot: adapter.shellSnapshot,
     };
@@ -136,7 +169,6 @@ export async function processHookInput(
 
     const snapshotResult = await handlePostShell(snapshotCtx);
 
-    // Propagate execution_id from snapshot events to adapter shell event
     const snapshotExecId =
       snapshotResult.events[0]?.meta?.["dev.agent-trace.execution_id"];
     if (snapshotExecId) {
@@ -163,10 +195,10 @@ export async function processHookInput(
     }
 
     for (const raw of adapterEvents) {
-      dispatchTraceEvent(raw, extensions, toolInfo, ignoreConfig);
+      dispatchTraceEvent(raw, extensions, ctx, ignoreConfig);
     }
     for (const raw of snapshotResult.events) {
-      dispatchTraceEvent(raw, extensions, toolInfo, ignoreConfig);
+      dispatchTraceEvent(raw, extensions, ctx, ignoreConfig);
     }
 
     return {

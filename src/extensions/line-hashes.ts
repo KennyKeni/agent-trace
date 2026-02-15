@@ -1,8 +1,17 @@
 import { join } from "node:path";
-import { getWorkspaceRoot, tryReadFile } from "../core/trace-store";
-import type { FileEdit } from "../core/types";
-import { normalizeNewlines, resolvePosition } from "../core/utils";
-import { appendJsonl, nowIso, sanitizeSessionId } from "./helpers";
+import {
+  CAPABILITIES,
+  type Extension,
+  type ExtensionContext,
+  type FileEdit,
+  type PipelineEvent,
+} from "../core/types";
+import {
+  normalizeNewlines,
+  nowIso,
+  resolvePosition,
+  sanitizeSessionId,
+} from "../core/utils";
 
 const TRACE_ROOT_DIR = ".agent-trace";
 
@@ -17,12 +26,12 @@ export function appendLineHashes(
   filePath: string,
   eventName: string,
   edits: FileEdit[],
-  fileContent?: string,
-  root = getWorkspaceRoot(),
+  fileContent: string | undefined,
+  ctx: ExtensionContext,
 ): void {
   const sid = sanitizeSessionId(sessionId);
   const path = join(
-    root,
+    ctx.root,
     TRACE_ROOT_DIR,
     "line-hashes",
     provider,
@@ -36,7 +45,7 @@ export function appendLineHashes(
     const hashes = lines.map(lineHash);
     const pos = resolvePosition(edit, fileContent);
 
-    appendJsonl(path, {
+    ctx.appendJsonl(path, {
       timestamp: nowIso(),
       file: filePath,
       event: eventName,
@@ -75,11 +84,11 @@ export function appendLineHashesFromPatch(
   eventName: string,
   patch: string,
   ranges: Array<{ start_line: number; end_line: number }>,
-  root = getWorkspaceRoot(),
+  ctx: ExtensionContext,
 ): void {
   const sid = sanitizeSessionId(sessionId);
   const path = join(
-    root,
+    ctx.root,
     TRACE_ROOT_DIR,
     "line-hashes",
     provider,
@@ -99,7 +108,7 @@ export function appendLineHashesFromPatch(
     const lines = hunkLines[i] ?? [];
     if (lines.length === 0) continue;
     const hashes = lines.map(lineHash);
-    appendJsonl(path, {
+    ctx.appendJsonl(path, {
       timestamp: nowIso(),
       file: filePath,
       event: eventName,
@@ -110,9 +119,10 @@ export function appendLineHashesFromPatch(
   }
 }
 
-export const lineHashesExtension = {
+export const lineHashesExtension: Extension = {
   name: "line-hashes",
-  onTraceEvent(event: import("../core/types").TraceEvent) {
+  capabilities: [CAPABILITIES.NEEDS_PATCHES],
+  onTraceEvent(event: PipelineEvent, ctx: ExtensionContext) {
     if (event.kind !== "file_edit") return;
 
     const patchForHashes = event.hunkPatch ?? event.precomputedPatch;
@@ -128,13 +138,14 @@ export const lineHashesExtension = {
         event.eventName,
         patchForHashes,
         event.snapshotRanges,
+        ctx,
       );
       return;
     }
 
     if (event.edits.length === 0) return;
-    const fileContent = event.readContent
-      ? tryReadFile(event.filePath)
+    const fileContent = event.edits.some((e) => e.new_string && !e.range)
+      ? ctx.tryReadFile(event.filePath)
       : undefined;
     appendLineHashes(
       event.provider,
@@ -143,6 +154,7 @@ export const lineHashesExtension = {
       event.eventName,
       event.edits,
       fileContent,
+      ctx,
     );
   },
 };

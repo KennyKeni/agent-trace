@@ -40,4 +40,27 @@ describe("parseArgs", () => {
       process.chdir(origDir);
     }
   });
+
+  test("rawCapture defaults to false", () => {
+    const opts = parseArgs(["--target-root", "/tmp/fake-repo"]);
+    expect(opts.rawCapture).toBe(false);
+  });
+
+  test("--raw-capture sets rawCapture true", () => {
+    const opts = parseArgs([
+      "--raw-capture",
+      "--target-root",
+      "/tmp/fake-repo",
+    ]);
+    expect(opts.rawCapture).toBe(true);
+  });
+
+  test("--no-raw-capture sets rawCapture false", () => {
+    const opts = parseArgs([
+      "--no-raw-capture",
+      "--target-root",
+      "/tmp/fake-repo",
+    ]);
+    expect(opts.rawCapture).toBe(false);
+  });
 });

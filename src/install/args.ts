@@ -36,6 +36,7 @@ export function parseArgs(argv: string[]): InstallOptions {
     providers?: string;
     "target-root"?: string[];
     "dry-run"?: boolean;
+    "raw-capture"?: boolean;
     latest?: boolean;
   };
 
@@ -46,9 +47,11 @@ export function parseArgs(argv: string[]): InstallOptions {
         providers: { type: "string" },
         "target-root": { type: "string", multiple: true },
         "dry-run": { type: "boolean" },
+        "raw-capture": { type: "boolean" },
         latest: { type: "boolean" },
       },
       strict: true,
+      allowNegative: true,
     }));
   } catch (err) {
     if (err instanceof TypeError) {
@@ -68,5 +71,13 @@ export function parseArgs(argv: string[]): InstallOptions {
 
   const dedupedTargets = [...new Set(targetRoots.map(normalizePath))];
 
-  return { providers, dryRun, version, targetRoots: dedupedTargets };
+  const rawCapture = values["raw-capture"] ?? false;
+
+  return {
+    providers,
+    rawCapture,
+    dryRun,
+    version,
+    targetRoots: dedupedTargets,
+  };
 }

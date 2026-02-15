@@ -1,8 +1,8 @@
 import type {
   FileEdit,
   HookInput,
+  PipelineEvent,
   ShellSnapshotCapability,
-  TraceEvent,
 } from "../core/types";
 import { maybeString, safeRecord, textFromUnknown } from "../core/utils";
 import { normalizeModelId } from "./utils";
@@ -60,7 +60,9 @@ export function sessionIdFor(input: HookInput): string | undefined {
   );
 }
 
-export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
+export function adapt(
+  input: HookInput,
+): PipelineEvent | PipelineEvent[] | undefined {
   const oi = input as OpenCodeHookInput;
   const sessionId = sessionIdFor(input);
   const model = normalizeModelId(input.model);
@@ -147,7 +149,6 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
         filePath: path,
         edits: [],
         model,
-        diffs: false,
         eventName: "file.edited",
         meta: {
           event: "file.edited",
@@ -202,7 +203,7 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
       const files = oi.files;
       if (!files || files.length === 0) return undefined;
 
-      const events: TraceEvent[] = [];
+      const events: PipelineEvent[] = [];
       for (const f of files) {
         const edits: FileEdit[] = [
           {
@@ -216,7 +217,6 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
           sessionId,
           filePath: f.file,
           edits,
-          diffs: true,
           eventName: "hook:tool.execute.after",
           model,
           meta: {

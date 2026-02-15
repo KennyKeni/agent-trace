@@ -24,13 +24,6 @@ const EXTENSION_OPTIONS = [
     hint: "line-level attribution",
   },
   { value: "messages", label: "Messages", hint: "conversation history" },
-  {
-    value: "raw-events",
-    label: "Raw Events",
-    hint: color.yellow(
-      "stores full hook payloads — may contain sensitive data",
-    ),
-  },
 ] as const;
 
 const ON_CANCEL = {
@@ -72,6 +65,11 @@ async function freshInstall(root: string): Promise<void> {
             hint: ext.hint,
           })),
           required: false,
+        }),
+      rawCapture: () =>
+        p.confirm({
+          message: `Capture raw hook payloads? ${color.yellow("may contain sensitive data")}`,
+          initialValue: false,
         }),
       version: () =>
         p.select<string>({
@@ -118,6 +116,7 @@ async function freshInstall(root: string): Promise<void> {
   const changes = install({
     providers: options.providers,
     extensions: options.extensions,
+    rawCapture: options.rawCapture === true,
     dryRun: false,
     version: options.version,
     targetRoots: [options.targetRoot],

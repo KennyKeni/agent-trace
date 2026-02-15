@@ -1,7 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
+import type { ExtensionContext } from "../../core/types";
+import { ensureParent } from "../../core/utils";
 import { appendDiffArtifact, createPatchFromStrings } from "../diffs";
+
+function makeCtx(root: string): ExtensionContext {
+  return {
+    root,
+    appendJsonl(path, value) {
+      ensureParent(path);
+      appendFileSync(path, `${JSON.stringify(value)}\n`, "utf-8");
+    },
+    appendText(path, text) {
+      ensureParent(path);
+      appendFileSync(path, text, "utf-8");
+    },
+    tryReadFile(path) {
+      try {
+        return readFileSync(path, "utf-8");
+      } catch {
+        return undefined;
+      }
+    },
+  };
+}
 
 describe("createPatchFromStrings", () => {
   it("returns undefined for identical strings", () => {
@@ -128,7 +157,7 @@ describe("appendDiffArtifact (precomputedPatch path)", () => {
       "new-file.ts",
       "PostToolUse",
       precomputedPatch,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const path = join(

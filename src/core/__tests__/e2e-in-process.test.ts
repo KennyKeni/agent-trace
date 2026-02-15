@@ -49,6 +49,12 @@ describe("in-process E2E: parity", () => {
   });
 
   test("PostToolUse/Edit produces trace + diff + raw event", async () => {
+    // Enable raw capture for this test
+    writeFileSync(
+      join(tmpDir, ".agent-trace", "config.json"),
+      JSON.stringify({ rawCapture: true }),
+    );
+
     const filePath = join(tmpDir, "src", "index.ts");
     await runInProcess(
       "claude",
@@ -159,6 +165,11 @@ describe("in-process E2E: new coverage", () => {
   test("2: no-git degradation — adapter events still work", async () => {
     const nonGitDir = mkdtempSync(join(tmpdir(), "agent-trace-nogit-"));
     initAgentTrace(nonGitDir);
+    // Enable raw capture
+    writeFileSync(
+      join(nonGitDir, ".agent-trace", "config.json"),
+      JSON.stringify({ rawCapture: true }),
+    );
     try {
       await runInProcess(
         "claude",
@@ -233,7 +244,7 @@ describe("in-process E2E: new coverage", () => {
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, "config.json"),
-      JSON.stringify({ extensions: ["diffs"] }),
+      JSON.stringify({ extensions: ["diffs"], rawCapture: true }),
     );
 
     const filePath = join(gitDir, "ext-test.ts");
@@ -258,6 +269,35 @@ describe("in-process E2E: new coverage", () => {
 
     const messages = readArtifact(gitDir, "messages", "claude", "ext-filter");
     expect(messages).toBeUndefined();
+
+    // Raw capture is pipeline-level (not an extension), independent of extension list
+    const raw = readArtifact(gitDir, "raw", "claude", "ext-filter");
+    expect(raw).toBeDefined();
+  });
+
+  test("4b: rawCapture false produces no raw artifacts", async () => {
+    const configDir = join(gitDir, ".agent-trace");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "config.json"),
+      JSON.stringify({ rawCapture: false }),
+    );
+
+    const filePath = join(gitDir, "no-raw.ts");
+    await runInProcess(
+      "claude",
+      claudeEdit(filePath, "const a = 1;", "const a = 2;", {
+        session_id: "no-raw-sess",
+      }),
+      gitDir,
+    );
+
+    const raw = readArtifact(gitDir, "raw", "claude", "no-raw-sess");
+    expect(raw).toBeUndefined();
+
+    // Other artifacts still produced
+    const traces = readTraces(gitDir);
+    expect(traces.length).toBeGreaterThanOrEqual(1);
   });
 
   test("5: ignore skip mode — ignored files produce no trace", async () => {

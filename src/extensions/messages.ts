@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import { getWorkspaceRoot } from "../core/trace-store";
-import { appendJsonl, nowIso, sanitizeSessionId } from "./helpers";
+import type { Extension, ExtensionContext, PipelineEvent } from "../core/types";
+import { nowIso, sanitizeSessionId } from "../core/utils";
 
 const TRACE_ROOT_DIR = ".agent-trace";
 
@@ -16,11 +16,17 @@ export function appendMessage(
   provider: string,
   sessionId: string | undefined,
   message: MessageRecord,
-  root = getWorkspaceRoot(),
+  ctx: ExtensionContext,
 ): string {
   const sid = sanitizeSessionId(sessionId);
-  const path = join(root, TRACE_ROOT_DIR, "messages", provider, `${sid}.jsonl`);
-  appendJsonl(path, {
+  const path = join(
+    ctx.root,
+    TRACE_ROOT_DIR,
+    "messages",
+    provider,
+    `${sid}.jsonl`,
+  );
+  ctx.appendJsonl(path, {
     id: crypto.randomUUID(),
     timestamp: nowIso(),
     provider,
@@ -30,18 +36,23 @@ export function appendMessage(
   return path;
 }
 
-export const messagesExtension = {
+export const messagesExtension: Extension = {
   name: "messages",
-  onTraceEvent(event: import("../core/types").TraceEvent) {
+  onTraceEvent(event: PipelineEvent, ctx: ExtensionContext) {
     if (event.kind !== "message") return;
     const metadata =
       Object.keys(event.meta).length > 0 ? event.meta : undefined;
-    appendMessage(event.provider, event.sessionId, {
-      role: event.role,
-      content: event.content,
-      event: event.eventName,
-      model_id: event.model,
-      metadata,
-    });
+    appendMessage(
+      event.provider,
+      event.sessionId,
+      {
+        role: event.role,
+        content: event.content,
+        event: event.eventName,
+        model_id: event.model,
+        metadata,
+      },
+      ctx,
+    );
   },
 };

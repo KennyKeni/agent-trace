@@ -13,18 +13,18 @@ import {
 } from "./snapshot-state";
 import type {
   HookInput,
+  PipelineEvent,
   RangePosition,
   ShellMatcher,
   ShellSnapshotCapability,
-  TraceEvent,
 } from "./types";
 
 export interface SnapshotContext {
   provider: string;
   input: HookInput;
   repoRoot: string;
-  adapterEvents: TraceEvent[];
-  activeExtensionNames: string[];
+  adapterEvents: PipelineEvent[];
+  capabilities: Set<string>;
   sessionIdFor: (input: HookInput) => string | undefined;
   shellSnapshot?: ShellSnapshotCapability;
 }
@@ -69,8 +69,8 @@ function extractCommand(input: HookInput): string | undefined {
     : undefined;
 }
 
-function needsPatch(extensionNames: string[]): boolean {
-  return extensionNames.some((n) => n === "diffs" || n === "line-hashes");
+function needsPatch(capabilities: Set<string>): boolean {
+  return capabilities.has("needs_patches");
 }
 
 function hunkToRangePosition(hunk: Hunk): RangePosition {
@@ -135,7 +135,7 @@ export async function handlePreHook(ctx: SnapshotContext): Promise<boolean> {
 }
 
 interface PostShellResult {
-  events: TraceEvent[];
+  events: PipelineEvent[];
   deletedPaths: string[];
 }
 
@@ -147,7 +147,7 @@ function makeFailureShellEvent(
   ctx: SnapshotContext,
   sessionId: string,
   executionId?: string,
-): TraceEvent {
+): PipelineEvent {
   const cmd = extractCommand(ctx.input);
   return {
     kind: "shell",
@@ -177,7 +177,7 @@ export async function handlePostShell(
 
     const sessionId = getSessionId(ctx);
     const callId = ctx.shellSnapshot?.callId?.(ctx.input);
-    const includePatch = needsPatch(ctx.activeExtensionNames);
+    const includePatch = needsPatch(ctx.capabilities);
 
     let preTree: string | undefined;
     let pairedViaCallId = false;
@@ -256,7 +256,7 @@ export async function handlePostShell(
       return emptyResult();
     }
 
-    const events: TraceEvent[] = [];
+    const events: PipelineEvent[] = [];
     const deletedPaths: string[] = [];
 
     for (const file of diff.files) {
@@ -283,7 +283,6 @@ export async function handlePostShell(
         precomputedPatch: file.patch,
         model: ctx.input.model,
         eventName: ctx.input.hook_event_name,
-        diffs: includePatch,
         meta: {
           "dev.agent-trace.source": "vcs_snapshot",
           "dev.agent-trace.attribution_confidence": "correlated",

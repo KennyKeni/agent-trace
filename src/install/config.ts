@@ -19,6 +19,7 @@ export function installConfig(
   dryRun: boolean,
   version: string,
   extensions: string[] = [],
+  rawCapture = false,
 ): ChangeSummary {
   const path = join(targetRoot, ".agent-trace", "config.json");
 
@@ -29,6 +30,7 @@ export function installConfig(
   const config = {
     version,
     extensions,
+    rawCapture,
     useGitignore: true,
     useBuiltinSensitive: true,
     ignore: [] as string[],

@@ -1,7 +1,36 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
+import type { ExtensionContext } from "../../core/types";
+import { ensureParent } from "../../core/utils";
 import { appendLineHashes, appendLineHashesFromPatch } from "../line-hashes";
+
+function makeCtx(root: string): ExtensionContext {
+  return {
+    root,
+    appendJsonl(path, value) {
+      ensureParent(path);
+      appendFileSync(path, `${JSON.stringify(value)}\n`, "utf-8");
+    },
+    appendText(path, text) {
+      ensureParent(path);
+      appendFileSync(path, text, "utf-8");
+    },
+    tryReadFile(path) {
+      try {
+        return readFileSync(path, "utf-8");
+      } catch {
+        return undefined;
+      }
+    },
+  };
+}
 
 const TMP_ROOT = join(import.meta.dir, "__tmp_line_hashes__");
 
@@ -39,7 +68,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: newString }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -57,7 +86,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "hello\nworld" }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -76,7 +105,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "identical" }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
     appendLineHashes(
       "test",
@@ -85,7 +114,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "identical" }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -102,7 +131,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "alpha" }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
     appendLineHashes(
       "test",
@@ -111,7 +140,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "beta" }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -139,7 +168,7 @@ describe("appendLineHashes", () => {
         },
       ],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -159,7 +188,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "target line" }],
       fileContent,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -181,7 +210,7 @@ describe("appendLineHashes", () => {
         { old_string: "", new_string: "keep" },
       ],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -198,7 +227,7 @@ describe("appendLineHashes", () => {
       "PostToolUse",
       [{ old_string: "", new_string: "a\n\nb" }],
       undefined,
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "sess1") as Array<{
@@ -228,7 +257,7 @@ describe("appendLineHashesFromPatch", () => {
       "PostToolUse",
       patch,
       [{ start_line: 1, end_line: 3 }],
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "patch-sess") as Array<{
@@ -262,7 +291,7 @@ describe("appendLineHashesFromPatch", () => {
       "PostToolUse",
       patch,
       [{ start_line: 1, end_line: 1 }],
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "patch-sess2") as Array<{
@@ -298,7 +327,7 @@ describe("appendLineHashesFromPatch", () => {
         { start_line: 1, end_line: 3 },
         { start_line: 11, end_line: 14 },
       ],
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "patch-sess3") as Array<{
@@ -327,7 +356,7 @@ describe("appendLineHashesFromPatch", () => {
       "PostToolUse",
       patch,
       [{ start_line: 1, end_line: 2 }],
-      TMP_ROOT,
+      makeCtx(TMP_ROOT),
     );
 
     const records = readRecords("test", "patch-sess4") as Array<{

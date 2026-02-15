@@ -54,7 +54,7 @@ function makeCtx(
     },
     repoRoot,
     adapterEvents: [],
-    activeExtensionNames: [],
+    capabilities: new Set<string>(),
     sessionIdFor: (i) => i.session_id ?? i.conversation_id ?? i.generation_id,
     shellSnapshot: shellSnapshotByProvider[provider],
     ...overrides,
@@ -317,7 +317,7 @@ describe("snapshot-middleware", () => {
             meta: {},
           },
         ],
-        activeExtensionNames: ["diffs"],
+        capabilities: new Set(["needs_patches"]),
       });
       const result = await handlePostShell(postCtx);
 

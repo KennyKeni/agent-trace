@@ -53,9 +53,9 @@ describe("loadConfig", () => {
 
   test("parses extensions array from config", () => {
     const root = tmpRoot();
-    writeConfig(root, { extensions: ["diffs", "raw-events"] });
+    writeConfig(root, { extensions: ["diffs", "messages"] });
     const config = loadConfig(root);
-    expect(config.extensions).toEqual(["diffs", "raw-events"]);
+    expect(config.extensions).toEqual(["diffs", "messages"]);
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -91,6 +91,37 @@ describe("loadConfig", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  test("rawCapture defaults to false when missing", () => {
+    const root = tmpRoot();
+    writeConfig(root, {});
+    const config = loadConfig(root);
+    expect(config.rawCapture).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("rawCapture defaults to false when no config file", () => {
+    const root = tmpRoot();
+    const config = loadConfig(root);
+    expect(config.rawCapture).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("rawCapture explicit false", () => {
+    const root = tmpRoot();
+    writeConfig(root, { rawCapture: false });
+    const config = loadConfig(root);
+    expect(config.rawCapture).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("rawCapture explicit true", () => {
+    const root = tmpRoot();
+    writeConfig(root, { rawCapture: true });
+    const config = loadConfig(root);
+    expect(config.rawCapture).toBe(true);
+    rmSync(root, { recursive: true, force: true });
+  });
+
   test("malformed JSON logs error and returns defaults", () => {
     const root = tmpRoot();
     const dir = join(root, ".agent-trace");
@@ -99,6 +130,7 @@ describe("loadConfig", () => {
     const config = loadConfig(root);
     expect(config.extensions).toBeNull();
     expect(config.ignore.mode).toBe("redact");
+    expect(config.rawCapture).toBe(false);
     rmSync(root, { recursive: true, force: true });
   });
 });

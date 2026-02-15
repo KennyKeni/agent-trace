@@ -101,6 +101,7 @@ export function createTrace(
   type: ContributorType,
   filePath: string,
   opts: {
+    root?: string;
     model?: string;
     rangePositions?: RangePosition[];
     transcript?: string | null;
@@ -108,7 +109,7 @@ export function createTrace(
     metadata?: Record<string, unknown>;
   } = {},
 ): TraceRecord | undefined {
-  const root = getWorkspaceRoot();
+  const root = opts.root ?? getWorkspaceRoot();
   const relativePath = toRelativePath(filePath, root);
   if (!relativePath) return undefined;
   const conversationUrl = opts.transcript
@@ -141,10 +142,10 @@ export function createTrace(
   };
 }
 
-export function appendTrace(trace: TraceRecord): void {
-  const root = getWorkspaceRoot();
-  const filePath = join(root, TRACE_PATH);
-  const dir = join(root, ".agent-trace");
+export function appendTrace(trace: TraceRecord, root?: string): void {
+  const resolvedRoot = root ?? getWorkspaceRoot();
+  const filePath = join(resolvedRoot, TRACE_PATH);
+  const dir = join(resolvedRoot, ".agent-trace");
   ensureDir(dir);
   appendFileSync(filePath, `${JSON.stringify(trace)}\n`, "utf-8");
 }

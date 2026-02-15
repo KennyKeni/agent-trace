@@ -250,7 +250,7 @@ describe("opencode adapt – command.executed (suppressed)", () => {
 });
 
 describe("opencode adapt – file.edited (generic, unchanged)", () => {
-  test("returns file_edit with diffs:false", () => {
+  test("returns file_edit with empty edits", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "file.edited",
@@ -260,7 +260,6 @@ describe("opencode adapt – file.edited (generic, unchanged)", () => {
     expect(result).toMatchObject({
       kind: "file_edit",
       sessionId: "test-session",
-      diffs: false,
       edits: [],
       filePath: "src/index.ts",
       eventName: "file.edited",
@@ -312,7 +311,7 @@ describe("opencode adapt – hook:chat.message", () => {
 });
 
 describe("opencode adapt – hook:tool.execute.after", () => {
-  test("single file returns file_edit with diffs:true", () => {
+  test("single file returns file_edit with edits", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "hook:tool.execute.after",
@@ -327,7 +326,6 @@ describe("opencode adapt – hook:tool.execute.after", () => {
       kind: "file_edit",
       provider: "opencode",
       filePath: "src/index.ts",
-      diffs: true,
       edits: [{ old_string: "old code", new_string: "new code" }],
       eventName: "hook:tool.execute.after",
       meta: {

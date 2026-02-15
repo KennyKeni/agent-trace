@@ -111,10 +111,9 @@ describe("cursor adapt – afterFileEdit", () => {
       sessionId: "test-session",
       filePath: "/tmp/test.ts",
       edits: [{ old_string: "old", new_string: "new" }],
-      readContent: true,
       model: "openai/gpt-4",
       eventName: "afterFileEdit",
-      transcript: "/tmp/transcript.json",
+      meta: { transcript_path: "/tmp/transcript.json" },
     });
   });
 
@@ -137,7 +136,7 @@ describe("cursor adapt – afterFileEdit", () => {
 });
 
 describe("cursor adapt – afterTabFileEdit", () => {
-  test("returns file_edit without readContent", () => {
+  test("returns file_edit", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "afterTabFileEdit",
@@ -150,8 +149,6 @@ describe("cursor adapt – afterTabFileEdit", () => {
       filePath: "/tmp/tab.ts",
       eventName: "afterTabFileEdit",
     });
-    const event = result as { readContent?: boolean };
-    expect(event.readContent).toBeUndefined();
   });
 
   test("returns undefined without file_path", () => {
@@ -177,10 +174,10 @@ describe("cursor adapt – afterShellExecution", () => {
       provider: "cursor",
       sessionId: "test-session",
       model: "openai/gpt-4",
-      transcript: "/tmp/transcript.json",
       meta: {
         command: "npm test",
         duration_ms: 1500,
+        transcript_path: "/tmp/transcript.json",
       },
     });
     expect(result).not.toHaveProperty("eventName");

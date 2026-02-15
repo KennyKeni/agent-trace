@@ -143,10 +143,9 @@ describe("claude adapt – PostToolUse (Bash)", () => {
       },
     });
     expect(result).not.toHaveProperty("eventName");
-    expect((result as any).transcript).toBeUndefined();
   });
 
-  test("passes transcript when provided", () => {
+  test("passes transcript_path in meta when provided", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "PostToolUse",
@@ -155,7 +154,7 @@ describe("claude adapt – PostToolUse (Bash)", () => {
         transcript_path: "/tmp/transcript.json",
       }),
     );
-    expect(result).toMatchObject({ transcript: "/tmp/transcript.json" });
+    expect((result as any).meta.transcript_path).toBe("/tmp/transcript.json");
   });
 });
 
@@ -174,7 +173,6 @@ describe("claude adapt – PostToolUse (Write)", () => {
       sessionId: "test-session",
       filePath: "/tmp/test.ts",
       edits: [{ old_string: "", new_string: "new file content" }],
-      readContent: true,
       eventName: "PostToolUse",
       meta: { session_id: "test-session", tool_name: "Write" },
     });
@@ -193,7 +191,7 @@ describe("claude adapt – PostToolUse (Write)", () => {
     });
   });
 
-  test("passes transcript when provided", () => {
+  test("passes transcript_path in meta when provided", () => {
     const result = adapt(
       makeInput({
         hook_event_name: "PostToolUse",
@@ -202,7 +200,7 @@ describe("claude adapt – PostToolUse (Write)", () => {
         transcript_path: "/tmp/transcript.json",
       }),
     );
-    expect(result).toMatchObject({ transcript: "/tmp/transcript.json" });
+    expect((result as any).meta.transcript_path).toBe("/tmp/transcript.json");
   });
 });
 
@@ -251,7 +249,6 @@ describe("claude adapt – PostToolUse (Edit)", () => {
     );
     expect(result).toMatchObject({
       filePath: ".unknown",
-      readContent: false,
     });
   });
 

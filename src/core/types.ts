@@ -26,60 +26,79 @@ export interface HookInput {
   tool_input?: Record<string, unknown>;
 }
 
-export type TraceEvent =
-  | {
-      kind: "file_edit";
-      provider: string;
-      sessionId?: string;
-      filePath: string;
-      edits: FileEdit[];
-      snapshotRanges?: RangePosition[];
-      hunkPatch?: string;
-      precomputedPatch?: string;
-      model?: string;
-      transcript?: string | null;
-      readContent?: boolean;
-      diffs?: boolean;
-      eventName: string;
-      tool?: { name: string; version?: string };
-      meta: Record<string, unknown>;
-    }
-  | {
-      kind: "shell";
-      provider: string;
-      sessionId?: string;
-      model?: string;
-      transcript?: string | null;
-      tool?: { name: string; version?: string };
-      meta: Record<string, unknown>;
-    }
-  | {
-      kind: "session_start";
-      provider: string;
-      sessionId?: string;
-      model?: string;
-      tool?: { name: string; version?: string };
-      meta: Record<string, unknown>;
-    }
-  | {
-      kind: "session_end";
-      provider: string;
-      sessionId?: string;
-      model?: string;
-      tool?: { name: string; version?: string };
-      meta: Record<string, unknown>;
-    }
-  | {
-      kind: "message";
-      provider: string;
-      sessionId?: string;
-      role: "user" | "assistant" | "system";
-      content: string;
-      eventName: string;
-      model?: string;
-      tool?: { name: string; version?: string };
-      meta: Record<string, unknown>;
-    };
+// --- Pipeline Event (internal boundary type) ---
+
+interface PipelineEventBase {
+  kind: string;
+  provider: string;
+  sessionId?: string;
+  model?: string;
+  meta: Record<string, unknown>;
+}
+
+export interface FileEditEvent extends PipelineEventBase {
+  kind: "file_edit";
+  filePath: string;
+  eventName: string;
+  edits: FileEdit[];
+  snapshotRanges?: RangePosition[];
+  hunkPatch?: string;
+  precomputedPatch?: string;
+}
+
+export interface ShellEvent extends PipelineEventBase {
+  kind: "shell";
+}
+
+export interface MessageEvent extends PipelineEventBase {
+  kind: "message";
+  eventName: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface SessionStartEvent extends PipelineEventBase {
+  kind: "session_start";
+}
+
+export interface SessionEndEvent extends PipelineEventBase {
+  kind: "session_end";
+}
+
+export type PipelineEvent =
+  | FileEditEvent
+  | ShellEvent
+  | MessageEvent
+  | SessionStartEvent
+  | SessionEndEvent;
+
+// --- Capabilities ---
+
+export const CAPABILITIES = {
+  NEEDS_PATCHES: "needs_patches",
+} as const;
+
+export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
+
+// --- Extension Context ---
+
+export interface ExtensionContext {
+  root: string;
+  toolInfo?: { name: string; version?: string };
+  appendJsonl(path: string, value: unknown): void;
+  appendText(path: string, text: string): void;
+  tryReadFile(path: string): string | undefined;
+}
+
+// --- Extension ---
+
+export interface Extension {
+  name: string;
+  capabilities?: Capability[];
+  onTraceEvent?(event: PipelineEvent, ctx: ExtensionContext): void;
+}
+
+// --- Provider ---
 
 export interface ShellMatcher {
   hookEvent: string;
@@ -94,18 +113,8 @@ export interface ShellSnapshotCapability {
 }
 
 export interface ProviderAdapter {
-  adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined;
+  adapt(input: HookInput): PipelineEvent | PipelineEvent[] | undefined;
   sessionIdFor(input: HookInput): string | undefined;
   toolInfo?(): { name: string; version?: string };
   shellSnapshot?: ShellSnapshotCapability;
-}
-
-export interface Extension {
-  name: string;
-  onRawInput?(
-    provider: string,
-    sessionId: string | undefined,
-    input: HookInput,
-  ): void;
-  onTraceEvent?(event: TraceEvent): void;
 }

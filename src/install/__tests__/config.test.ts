@@ -31,10 +31,21 @@ describe("installConfig", () => {
     );
     expect(config.version).toBe("1.0.0");
     expect(config.extensions).toEqual([]);
+    expect(config.rawCapture).toBe(false);
     expect(config.useGitignore).toBe(true);
     expect(config.useBuiltinSensitive).toBe(true);
     expect(config.ignore).toEqual([]);
     expect(config.ignoreMode).toBe("redact");
+  });
+
+  test("rawCapture false is written to config", () => {
+    const result = installConfig(tmpDir, false, "1.0.0", [], false);
+    expect(result.status).toBe("created");
+
+    const config = JSON.parse(
+      readFileSync(join(tmpDir, ".agent-trace", "config.json"), "utf-8"),
+    );
+    expect(config.rawCapture).toBe(false);
   });
 
   test("does not overwrite existing config", () => {

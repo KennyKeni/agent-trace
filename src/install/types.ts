@@ -9,6 +9,7 @@ export interface ChangeSummary {
 export interface InstallOptions {
   providers: Provider[];
   extensions?: string[];
+  rawCapture?: boolean;
   dryRun: boolean;
   version: string;
   targetRoots: string[];

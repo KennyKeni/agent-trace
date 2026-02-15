@@ -12,9 +12,10 @@ export interface IgnoreConfig {
   mode: IgnoreMode;
 }
 
-interface AgentTraceConfig {
+export interface AgentTraceConfig {
   extensions: string[] | null;
   ignore: IgnoreConfig;
+  rawCapture: boolean;
 }
 
 export const BUILTIN_SENSITIVE = [
@@ -34,6 +35,7 @@ export const BUILTIN_SENSITIVE = [
 
 interface RawConfig {
   extensions?: unknown;
+  rawCapture?: unknown;
   useGitignore?: unknown;
   useBuiltinSensitive?: unknown;
   ignore?: unknown;
@@ -89,6 +91,7 @@ export function loadConfig(root: string): AgentTraceConfig {
   return {
     extensions: extractExtensions(raw),
     ignore: extractIgnoreConfig(raw),
+    rawCapture: raw?.rawCapture === true,
   };
 }
 

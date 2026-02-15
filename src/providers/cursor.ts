@@ -1,8 +1,8 @@
 import type {
   FileEdit,
   HookInput,
+  PipelineEvent,
   ShellSnapshotCapability,
-  TraceEvent,
 } from "../core/types";
 import { textFromUnknown } from "../core/utils";
 import { normalizeModelId, sessionIdFor } from "./utils";
@@ -28,7 +28,9 @@ export const shellSnapshot: ShellSnapshotCapability = {
   post: [{ hookEvent: "afterShellExecution" }],
 };
 
-export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
+export function adapt(
+  input: HookInput,
+): PipelineEvent | PipelineEvent[] | undefined {
   const ci = input as CursorHookInput;
   const sessionId = sessionIdFor(input);
   const model = normalizeModelId(input.model);
@@ -46,12 +48,11 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
         filePath: ci.file_path,
         edits: ci.edits ?? [],
         model,
-        transcript: input.transcript_path,
-        readContent: true,
         eventName: "afterFileEdit",
         meta: {
           conversation_id: input.conversation_id,
           generation_id: input.generation_id,
+          transcript_path: input.transcript_path ?? undefined,
         },
       };
     }
@@ -79,12 +80,12 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
         provider: "cursor",
         sessionId,
         model,
-        transcript: input.transcript_path,
         meta: {
           conversation_id: input.conversation_id,
           generation_id: input.generation_id,
           command: ci.command,
           duration_ms: ci.duration_ms ?? ci.duration,
+          transcript_path: input.transcript_path ?? undefined,
         },
       };
     }

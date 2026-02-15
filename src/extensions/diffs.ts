@@ -1,9 +1,12 @@
-import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { structuredPatch } from "diff";
-import { getWorkspaceRoot } from "../core/trace-store";
-import { normalizeNewlines } from "../core/utils";
-import { ensureParent, nowIso, sanitizeSessionId } from "./helpers";
+import {
+  CAPABILITIES,
+  type Extension,
+  type ExtensionContext,
+  type PipelineEvent,
+} from "../core/types";
+import { normalizeNewlines, nowIso, sanitizeSessionId } from "../core/utils";
 
 const TRACE_ROOT_DIR = ".agent-trace";
 
@@ -52,25 +55,30 @@ export function appendDiffArtifact(
   filePath: string,
   eventName: string,
   diff: string,
-  root = getWorkspaceRoot(),
+  ctx: ExtensionContext,
 ): string {
   const sid = sanitizeSessionId(sessionId);
-  const path = join(root, TRACE_ROOT_DIR, "diffs", provider, `${sid}.patch`);
-  ensureParent(path);
+  const path = join(
+    ctx.root,
+    TRACE_ROOT_DIR,
+    "diffs",
+    provider,
+    `${sid}.patch`,
+  );
   const section = [
     `# event=${eventName} file=${filePath} timestamp=${nowIso()}`,
     diff.trimEnd(),
     "",
   ].join("\n");
-  appendFileSync(path, section, "utf-8");
+  ctx.appendText(path, section);
   return `file://${path}`;
 }
 
-export const diffsExtension = {
+export const diffsExtension: Extension = {
   name: "diffs",
-  onTraceEvent(event: import("../core/types").TraceEvent) {
+  capabilities: [CAPABILITIES.NEEDS_PATCHES],
+  onTraceEvent(event: PipelineEvent, ctx: ExtensionContext) {
     if (event.kind !== "file_edit") return;
-    if (event.diffs === false) return;
 
     if (event.precomputedPatch) {
       appendDiffArtifact(
@@ -79,6 +87,7 @@ export const diffsExtension = {
         event.filePath,
         event.eventName,
         event.precomputedPatch,
+        ctx,
       );
       return;
     }
@@ -96,6 +105,7 @@ export const diffsExtension = {
           event.filePath,
           event.eventName,
           diff,
+          ctx,
         );
       }
     }

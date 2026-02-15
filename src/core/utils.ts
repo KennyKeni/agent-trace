@@ -83,3 +83,13 @@ export function safeRecord(
     return undefined;
   return value as Record<string, unknown>;
 }
+
+export function sanitizeSessionId(sessionId?: string | null): string {
+  const raw = (sessionId ?? "unknown").trim();
+  if (!raw) return "unknown";
+  return raw.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+export function nowIso(): string {
+  return new Date().toISOString();
+}

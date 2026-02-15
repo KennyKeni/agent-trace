@@ -17,6 +17,7 @@ export function install(options: InstallOptions): ChangeSummary[] {
         options.dryRun,
         options.version,
         options.extensions,
+        options.rawCapture,
       ),
     );
 

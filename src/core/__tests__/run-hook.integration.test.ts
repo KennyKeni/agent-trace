@@ -67,6 +67,12 @@ afterEach(() => {
 describe("runHook integration", () => {
   describe("claude provider", () => {
     test("PostToolUse/Edit produces trace + diff + raw event", () => {
+      // Enable raw capture
+      writeFileSync(
+        join(tmpDir, ".agent-trace", "config.json"),
+        JSON.stringify({ rawCapture: true }),
+      );
+
       const filePath = join(tmpDir, "src", "index.ts");
       const { exitCode } = hook(
         "claude",
@@ -147,6 +153,12 @@ describe("runHook integration", () => {
     });
 
     test("UserPromptSubmit produces message + raw, no trace", () => {
+      // Enable raw capture
+      writeFileSync(
+        join(tmpDir, ".agent-trace", "config.json"),
+        JSON.stringify({ rawCapture: true }),
+      );
+
       const { exitCode } = hook(
         "claude",
         {

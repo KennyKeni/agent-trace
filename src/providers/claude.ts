@@ -1,7 +1,7 @@
 import type {
   HookInput,
+  PipelineEvent,
   ShellSnapshotCapability,
-  TraceEvent,
 } from "../core/types";
 import { textFromUnknown } from "../core/utils";
 import { normalizeModelId, sessionIdFor } from "./utils";
@@ -40,7 +40,9 @@ export const shellSnapshot: ShellSnapshotCapability = {
   },
 };
 
-export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
+export function adapt(
+  input: HookInput,
+): PipelineEvent | PipelineEvent[] | undefined {
   const ci = input as ClaudeHookInput;
   const sessionId = sessionIdFor(input);
   const model = normalizeModelId(input.model);
@@ -61,12 +63,12 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
           provider: "claude",
           sessionId,
           model,
-          transcript: input.transcript_path,
           meta: {
             session_id: input.session_id,
             tool_name: toolName,
             tool_use_id: ci.tool_use_id,
             command: ci.tool_input?.command,
+            transcript_path: input.transcript_path ?? undefined,
           },
         };
       }
@@ -91,13 +93,12 @@ export function adapt(input: HookInput): TraceEvent | TraceEvent[] | undefined {
         filePath: file,
         edits,
         model,
-        readContent: !!ci.tool_input?.file_path,
-        transcript: input.transcript_path,
         eventName: "PostToolUse",
         meta: {
           session_id: input.session_id,
           tool_name: toolName,
           tool_use_id: ci.tool_use_id,
+          transcript_path: input.transcript_path ?? undefined,
         },
       };
     }
