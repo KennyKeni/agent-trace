@@ -11,6 +11,7 @@ Supported providers:
 - Cursor
 - Claude Code
 - OpenCode
+- Codex
 
 ## Setup
 
@@ -26,7 +27,8 @@ Install for specific providers:
 
 ```bash
 bunx @kennykeni/agent-trace init --providers cursor
-bunx @kennykeni/agent-trace init --providers claude
+
+bunx @kennykeni/agent-trace init --providers claude,opencode,codex
 ```
 
 Install for a specific project:
@@ -35,10 +37,24 @@ Install for a specific project:
 bunx @kennykeni/agent-trace init --target-root ~/my-project
 ```
 
+Use the latest version instead of pinning to the current CLI version:
+
+```bash
+bunx @kennykeni/agent-trace init --latest
+```
+
 Preview what would be written:
 
 ```bash
 bunx @kennykeni/agent-trace init --dry-run
+```
+
+Uninstall hooks:
+
+```bash
+bunx @kennykeni/agent-trace uninstall
+bunx @kennykeni/agent-trace uninstall --providers cursor --dry-run
+bunx @kennykeni/agent-trace uninstall --purge
 ```
 
 Check installation status:
@@ -57,6 +73,7 @@ Creates `.agent-trace/config.json` with default settings and configures the targ
 | `.cursor/hooks.json`                    | Cursor hook registration         |
 | `.claude/settings.json`                 | Claude Code hook registration    |
 | `.opencode/plugins/agent-trace.ts`      | OpenCode plugin registration     |
+| `~/.codex/config.toml`                  | Codex global hook registration   |
 
 Existing `config.json` files are never overwritten — only created when absent.
 
@@ -82,13 +99,16 @@ Additional artifacts are written by extensions under `.agent-trace/`:
 
 ```json
 {
-  "extensions": ["diffs", "line-hashes", "raw-events", "messages"],
+  "version": "0.10.0",
+  "extensions": [],
   "useGitignore": true,
   "useBuiltinSensitive": true,
   "ignore": [],
   "ignoreMode": "redact"
 }
 ```
+
+The `version` field tracks which CLI version generated the config. Extensions default to none; the interactive installer (`init` with no flags) prompts you to select which extensions to enable.
 
 ### Extensions
 
