@@ -4,7 +4,7 @@ import { InstallError, parseArgs } from "../args";
 describe("parseArgs", () => {
   test("defaults to all providers", () => {
     const opts = parseArgs(["--target-root", "/tmp/fake-repo"]);
-    expect(opts.providers).toEqual(["cursor", "claude", "opencode", "codex"]);
+    expect(opts.providers).toEqual(["cursor", "claude", "opencode"]);
   });
 
   test("throws InstallError when any provider is invalid", () => {

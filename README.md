@@ -27,6 +27,7 @@ Install for specific providers:
 
 ```bash
 bunx @kennykeni/agent-trace init --providers cursor
+
 bunx @kennykeni/agent-trace init --providers claude,opencode,codex
 ```
 
@@ -179,14 +180,6 @@ Schema source: [`schemas.ts`](./src/core/schemas.ts)
 
 - **Two file-edit code paths**: `file.edited` events carry no diff data (`edits: []`, `diffs: false`). Only `hook:tool.execute.after` events include before/after content for diffs and line-hashes.
 - **Flexible session ID extraction**: Session IDs can appear in five different payload locations depending on the event type. The adapter tries them all in priority order.
-
-### Codex
-
-Codex does not use the hook pipeline like other providers. Instead it has its own CLI subcommands (`codex notify` and `codex ingest`) that process Codex event data separately.
-
-- **Only `apply_patch` tool calls traced**: File changes from shell commands or other mechanisms are not detected.
-- **Patch format stability**: `parsePatchInput` depends on Codex's `*** <Action> File:` patch grammar. If Codex changes the format, parsing fails silently.
-- **`*** Move to:` (rename) blocks not parsed**: Rename operations in apply_patch are not traced. This is a rare edge case.
 
 ## Development
 
